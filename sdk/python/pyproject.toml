@@ -1,0 +1,56 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "vigil-sdk"
+version = "0.1.0"
+description = "Instrumentation SDK for agents running under VIGIL runtime security."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "VIGIL Contributors" }]
+keywords = ["ai", "agents", "security", "prompt-injection", "runtime-security"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Security",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+# No runtime dependencies, on purpose. This package runs inside the agent process it is
+# protecting; every dependency it adds becomes part of that process's attack surface, and
+# version conflicts with the host application are the most common reason instrumentation
+# gets removed.
+dependencies = []
+
+[project.optional-dependencies]
+pydantic = ["pydantic>=2.0"]
+dev = ["pytest>=8.0", "mypy>=1.8", "ruff>=0.6"]
+
+[project.urls]
+Homepage = "https://github.com/bbrookhart/VIGIL"
+Documentation = "https://github.com/bbrookhart/VIGIL/tree/main/docs"
+Source = "https://github.com/bbrookhart/VIGIL"
+
+[tool.hatch.build.targets.wheel]
+packages = ["vigil_sdk"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_unreachable = true
+
+[tool.ruff]
+line-length = 96
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "S", "C4", "RET", "SIM"]
+# S101 (assert) is fine in tests; the SDK itself does not use bare asserts for control flow.
+per-file-ignores = { "tests/*" = ["S101"] }

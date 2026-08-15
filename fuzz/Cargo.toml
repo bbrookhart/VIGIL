@@ -1,0 +1,63 @@
+[package]
+name = "vigil-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+serde_json = "1"
+
+vigil-audit = { path = "../crates/vigil-audit" }
+vigil-capability = { path = "../crates/vigil-capability" }
+vigil-common = { path = "../crates/vigil-common" }
+vigil-detect = { path = "../crates/vigil-detect" }
+vigil-policy = { path = "../crates/vigil-policy" }
+vigil-protocol = { path = "../crates/vigil-protocol" }
+vigil-remit = { path = "../crates/vigil-remit" }
+
+# Fuzz targets are their own workspace so `cargo test --workspace` does not try to build
+# them with the stable toolchain, which cannot compile libfuzzer-sys.
+[workspace]
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "canonicalize"
+path = "fuzz_targets/canonicalize.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "capability_token"
+path = "fuzz_targets/capability_token.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "policy_bundle"
+path = "fuzz_targets/policy_bundle.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "network_analyze"
+path = "fuzz_targets/network_analyze.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "path_traversal"
+path = "fuzz_targets/path_traversal.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "action_request"
+path = "fuzz_targets/action_request.rs"
+test = false
+doc = false

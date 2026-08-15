@@ -1,0 +1,48 @@
+# Rust
+/target/
+**/*.rs.bk
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Node (console, TypeScript SDK — not yet built)
+node_modules/
+.next/
+
+# Local environment
+.env
+.env.*
+!.env.example
+
+# Editors
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Security: never commit key material or evidence exports.
+# These patterns exist because an accidental commit of a capability signing seed would let
+# anyone mint capabilities for a deployment, and an audit export can contain sensitive
+# forensic detail.
+*.pem
+*.key
+*.p12
+*.pfx
+!docs/security/*.asc
+/secrets/
+/audit-exports/
+*.vigil-bundle
+
+# Fuzzing: build output and the generated corpus are regenerable, but crash artifacts are
+# regression tests and are committed deliberately.
+fuzz/target/
+fuzz/corpus/
+fuzz/Cargo.lock

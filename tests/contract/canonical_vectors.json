@@ -1,0 +1,131 @@
+{
+  "profile": "VCJ/1",
+  "description": "Shared canonicalization vectors executed by both the Rust and Python implementations. Expected values are derived from the VCJ/1 specification, not from either implementation, so agreement is evidence rather than tautology. A divergence here is a signature-forgery primitive. See crates/vigil-common/src/canonical.rs and sdk/python/vigil_sdk/canonical.py.",
+  "accepted": [
+    {
+      "name": "key_order_is_normalized",
+      "input": {
+        "to": "x@example.com",
+        "body": "hi",
+        "cc": null
+      },
+      "canonical": "{\"body\":\"hi\",\"cc\":null,\"to\":\"x@example.com\"}"
+    },
+    {
+      "name": "key_order_is_normalized_reversed_input",
+      "input": {
+        "cc": null,
+        "body": "hi",
+        "to": "x@example.com"
+      },
+      "canonical": "{\"body\":\"hi\",\"cc\":null,\"to\":\"x@example.com\"}"
+    },
+    {
+      "name": "array_order_is_significant",
+      "input": [
+        "b",
+        "a"
+      ],
+      "canonical": "[\"b\",\"a\"]"
+    },
+    {
+      "name": "nested_objects_sorted_at_every_depth",
+      "input": {
+        "z": {
+          "b": 1,
+          "a": 2
+        },
+        "a": [
+          {
+            "d": 1,
+            "c": 2
+          }
+        ]
+      },
+      "canonical": "{\"a\":[{\"c\":2,\"d\":1}],\"z\":{\"a\":2,\"b\":1}}"
+    },
+    {
+      "name": "control_characters_use_short_escapes",
+      "input": {
+        "k": "a\nb\tc\u0001d\"e\\f"
+      },
+      "canonical": "{\"k\":\"a\\nb\\tc\\u0001d\\\"e\\\\f\"}"
+    },
+    {
+      "name": "non_ascii_is_literal_not_escaped",
+      "input": {
+        "k": "héllo — 日本 🙂"
+      },
+      "canonical": "{\"k\":\"héllo — 日本 🙂\"}"
+    },
+    {
+      "name": "integral_floats_render_as_integers",
+      "input": {
+        "a": 10.0,
+        "b": 10,
+        "c": -0.5,
+        "d": 0
+      },
+      "canonical": "{\"a\":10,\"b\":10,\"c\":-0.5,\"d\":0}"
+    },
+    {
+      "name": "booleans_and_null",
+      "input": {
+        "t": true,
+        "f": false,
+        "n": null
+      },
+      "canonical": "{\"f\":false,\"n\":null,\"t\":true}"
+    },
+    {
+      "name": "empty_containers",
+      "input": {
+        "o": {},
+        "a": []
+      },
+      "canonical": "{\"a\":[],\"o\":{}}"
+    },
+    {
+      "name": "utf16_key_ordering_differs_from_code_point_ordering",
+      "input": {
+        "Ｚ": 1,
+        "𐀀": 2
+      },
+      "canonical": "{\"𐀀\":2,\"Ｚ\":1}"
+    },
+    {
+      "name": "realistic_action_projection",
+      "input": {
+        "kind": "tool_call",
+        "name": "send_email",
+        "operation": "send",
+        "arguments": {
+          "to": [
+            "cfo@acme.example"
+          ],
+          "body": "Quarterly report attached.",
+          "attachments": []
+        },
+        "target_resource": null
+      },
+      "canonical": "{\"arguments\":{\"attachments\":[],\"body\":\"Quarterly report attached.\",\"to\":[\"cfo@acme.example\"]},\"kind\":\"tool_call\",\"name\":\"send_email\",\"operation\":\"send\",\"target_resource\":null}"
+    }
+  ],
+  "rejected": [
+    {
+      "name": "magnitude_at_or_above_1e16",
+      "input_literal": "1e17",
+      "reason": "shortest round-trip formatters disagree on exponent style here"
+    },
+    {
+      "name": "infinity",
+      "input_literal": "Infinity",
+      "reason": "non-finite values have no JSON representation"
+    },
+    {
+      "name": "nan",
+      "input_literal": "NaN",
+      "reason": "non-finite values have no JSON representation"
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+# Tool security manifests for the demo environment.
+#
+# Every tool an agent can reach declares what it does here. A tool with no entry is treated
+# conservatively (Tier 3, external write, approval required) rather than permissively, so
+# forgetting to add one is inconvenient rather than dangerous.
+
+- name: read_customer_record
+  description: Read a support record. Stays inside the trust boundary.
+  side_effect: internal_read
+  impact: tier1_low_risk_read
+  resources: [support_records]
+  arguments:
+    customer_id:
+      sensitivity: low
+  approval:
+    default: false
+
+- name: create_ticket
+  description: Open a support ticket. Reversible internal mutation.
+  side_effect: internal_write
+  impact: tier2_controlled_mutation
+  resources: [ticket_db]
+  arguments:
+    title:
+      may_contain_sensitive_data: true
+    body:
+      may_contain_sensitive_data: true
+  approval:
+    default: false
+  rate_limit:
+    per_agent_per_minute: 10
+
+- name: send_email
+  description: >
+    Send an email. Leaves the trust boundary, so it is Tier 3 and requires approval; the
+    credential is brokered so it never enters model context.
+  side_effect: external_write
+  impact: tier3_high_impact
+  resources: [external_communication]
+  arguments:
+    recipients:
+      sensitivity: high
+      requires_trusted_source: true
+    body:
+      may_contain_sensitive_data: true
+  approval:
+    default: true
+    operations: [send]
+  network:
+    destinations: [mail-provider.example]
+  credentials:
+    brokered: true
+    credential_ref: mail-provider-api-key
+  rate_limit:
+    per_agent_per_minute: 5
+
+- name: fetch_url
+  description: >
+    Fetch a page. Classified as an external *read*: it brings untrusted content in rather
+    than sending data out. Everything it returns is labelled EXTERNAL_UNTRUSTED.
+  side_effect: external_read
+  impact: tier1_low_risk_read
+  resources: [web]
+  approval:
+    default: false
+  rate_limit:
+    per_agent_per_minute: 20

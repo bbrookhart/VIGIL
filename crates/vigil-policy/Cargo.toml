@@ -1,0 +1,21 @@
+[package]
+name = "vigil-policy"
+description = "Deterministic authorization: the PolicyEngine abstraction and the built-in rule provider."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+vigil-common = { workspace = true }
+vigil-protocol = { workspace = true }
+
+async-trait = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml_ng = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+proptest = { workspace = true }

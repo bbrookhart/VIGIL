@@ -1,0 +1,25 @@
+[package]
+name = "vigil-cli"
+description = "The `vigil` operational command-line tool."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "vigil"
+path = "src/main.rs"
+
+[dependencies]
+vigil-audit = { workspace = true }
+vigil-common = { workspace = true }
+vigil-core = { workspace = true }
+vigil-policy = { workspace = true }
+vigil-remit = { workspace = true }
+
+clap = { workspace = true }
+ed25519-dalek = { workspace = true }
+hex = { workspace = true }
+rand = { workspace = true }
+serde_json = { workspace = true }

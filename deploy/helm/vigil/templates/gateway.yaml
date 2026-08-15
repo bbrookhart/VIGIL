@@ -1,0 +1,88 @@
+{{- if and (gt (int .Values.gateway.replicaCount) 1) (not .Values.gateway.sharedNonceStore.enabled) }}
+{{- fail "gateway.replicaCount > 1 requires gateway.sharedNonceStore.enabled: the in-memory nonce store is per-process, so each replica would independently accept the same single-use capability, permitting one replay per replica." }}
+{{- end }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "vigil.fullname" . }}-gateway
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "vigil.labels" . | nindent 4 }}
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "vigil.fullname" . }}-gateway
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "vigil.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8081
+      targetPort: http
+  selector: {{- include "vigil.gatewaySelectorLabels" . | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "vigil.fullname" . }}-gateway
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "vigil.labels" . | nindent 4 }}
+  annotations:
+    # Stated on the object itself so anyone reading `kubectl get deploy -o yaml` sees it.
+    vigil.security/credential-holder: >-
+      This workload holds the credentials for protected tools. Agents do not. That asymmetry
+      is what makes VIGIL non-bypassable; do not mount tool credentials into agent pods.
+spec:
+  replicas: {{ .Values.gateway.replicaCount }}
+  selector:
+    matchLabels: {{- include "vigil.gatewaySelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "vigil.labels" . | nindent 8 }}
+        app.kubernetes.io/component: gateway
+    spec:
+      serviceAccountName: {{ include "vigil.fullname" . }}-gateway
+      securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: gateway
+          image: {{ include "vigil.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/usr/local/bin/vigil-gateway", "/etc/vigil/vigil-gateway.yaml"]
+          securityContext: {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          env:
+            - name: RUST_LOG
+              value: info
+          # Tool credentials reach the Gateway and nothing else. They are referenced by name
+          # here and resolved from the secret at runtime; they never enter model context.
+          envFrom:
+            - secretRef:
+                name: {{ .Values.gateway.toolCredentialsSecret }}
+                optional: true
+          ports:
+            - name: http
+              containerPort: 8081
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources: {{- toYaml .Values.gateway.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/vigil/vigil-gateway.yaml
+              subPath: vigil-gateway.yaml
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "vigil.fullname" . }}-gateway-config
+        - name: tmp
+          emptyDir: {}

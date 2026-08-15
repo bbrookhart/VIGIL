@@ -1,0 +1,117 @@
+# VIGIL deployment values.
+#
+# Defaults are the safe end of every choice. Several of them will stop the chart rendering
+# until you make a deliberate decision — that is intentional, because the alternative is a
+# deployment that looks installed and enforces nothing.
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  registry: ghcr.io
+  repository: bbrookhart/vigil
+  tag: "" # defaults to .Chart.AppVersion
+  pullPolicy: IfNotPresent
+
+# The tenant this installation serves.
+tenant: ""
+
+core:
+  replicaCount: 2
+  # Protected Mode is the mode in which VIGIL's guarantees hold. `observability` decides and
+  # records but cannot prevent execution, and the console labels it accordingly.
+  mode: protected
+  requireWorkloadIdentity: true
+  allowUnregisteredAgents: false
+
+  resources:
+    requests: { cpu: 200m, memory: 256Mi }
+    limits: { cpu: "1", memory: 512Mi }
+
+  # Signing keys. Three distinct secrets, deliberately: compromise of the audit key must not
+  # permit minting capabilities, and compromise of the approval key must not permit forging
+  # checkpoints. Generate with `vigil keys generate`.
+  signingKeysSecret: vigil-signing-keys
+
+gateway:
+  # The in-memory nonce store is per-process, so N replicas would independently accept the
+  # same single-use capability — one replay per replica. The chart refuses to render more
+  # than one until a shared store is configured.
+  replicaCount: 1
+  sharedNonceStore:
+    enabled: false
+
+  resources:
+    requests: { cpu: 200m, memory: 256Mi }
+    limits: { cpu: "1", memory: 512Mi }
+
+  # Credentials for protected tools live here and *only* here. The agent never receives them.
+  toolCredentialsSecret: vigil-tool-credentials
+
+# How callers prove who they are.
+auth:
+  # `mtls_spiffe` is the production path: SPIRE or cert-manager issues an SVID per workload,
+  # the mesh terminates mTLS, and VIGIL maps the SPIFFE ID to a tenant and agent.
+  method: mtls_spiffe
+
+  peerIdentity:
+    # A service mesh terminates mTLS and forwards the peer identity in a header. The header
+    # is honoured *only* from the addresses listed below — a header any client can set is
+    # not an identity.
+    source: trusted_proxy
+    header: x-forwarded-client-cert
+    trustedPeers: []
+
+  # SPIFFE IDs are mapped by explicit registration, never by parsing the path. Deriving a
+  # tenant from a SPIFFE path would let anyone holding any valid SVID choose their tenant by
+  # choosing a workload name.
+  registrations: []
+  #  - spiffeId: spiffe://example.org/ns/agents/sa/support-assistant
+  #    tenantId: acme
+  #    agentId: customer-support-assistant
+  #  - spiffeId: spiffe://example.org/ns/console/sa/operator
+  #    tenantId: acme
+  #    principalId: operator-1
+  #    roles: [SupportLead, SecurityAnalyst]
+
+# The isolation boundary. This is the control that makes VIGIL non-bypassable.
+networkPolicy:
+  enabled: true
+
+  # Namespaces running protected agents. Their egress is restricted to VIGIL only.
+  agentNamespaces: []
+  #  - agents
+
+  # Where DNS lives, so agents can still resolve names.
+  dnsNamespace: kube-system
+
+  # Set true only if you accept that agents can reach arbitrary destinations directly, in
+  # which case VIGIL observes rather than enforces.
+  allowAgentInternetEgress: false
+
+policies:
+  # Policy bundles, remits and tool manifests are mounted from a ConfigMap. `vigil policy
+  # validate` should gate any change to them in CI.
+  configMapName: vigil-policies
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  privileged: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+serviceMonitor:
+  enabled: false

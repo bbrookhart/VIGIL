@@ -1,0 +1,88 @@
+# Data egress controls.
+#
+# Why: the highest-consequence failure of an agent system is not that it does something odd,
+# but that it moves something sensitive to somewhere it should not be. These rules are the
+# deterministic backstop for that class, independent of whether any detector fires.
+#
+# Note the shape: these match on *taint*, which VIGIL Trace computes from provenance, not on
+# the literal presence of a pattern in the arguments. An attacker who base64-encodes a secret
+# before sending it still trips these rules, because the taint travelled with the value.
+version: base-data-egress
+description: Deterministic controls on sensitive data leaving the trust boundary.
+default_effect: deny
+
+rules:
+  - id: secret-egress-001
+    description: >
+      Secrets and credentials must never leave the trust boundary through an agent action.
+      There is no approval path: a human approving a secret exfiltration is almost always a
+      human who has been socially engineered by the same injection that drove the agent.
+    effect: deny
+    severity: critical
+    when:
+      side_effects: [external_write, financial]
+      taints_any: [SECRET, CREDENTIAL, AUTHENTICATION_DATA]
+    reason_codes: [SECRET_EGRESS]
+    obligations:
+      - type: alert
+        severity: CRITICAL
+
+  - id: secret-egress-002
+    description: Secrets must not be written into memory that outlives the session.
+    effect: deny
+    severity: high
+    when:
+      action_kinds: [memory_write]
+      taints_any: [SECRET, CREDENTIAL, AUTHENTICATION_DATA]
+    reason_codes: [SECRET_EGRESS, MEMORY_POISONING_ATTEMPT]
+
+  - id: pii-egress-001
+    description: >
+      Personal and financial data leaving the boundary requires human approval rather than a
+      flat denial, because legitimate support workflows do send customer data to customers.
+    effect: require_approval
+    severity: high
+    when:
+      side_effects: [external_write]
+      taints_any: [PII, FINANCIAL_DATA]
+    reason_codes: [PII_EGRESS]
+    obligations:
+      # When several rules demand approval, VIGIL intersects their approver sets: the
+      # approver must be competent in every concern that fired. A base rule's set therefore
+      # has to stay broad enough to intersect with the agent-level sets that will also match,
+      # or the combination becomes unapprovable and operators disable the rule rather than
+      # route every routine customer email to a security analyst.
+      #
+      # SupportLead is included for exactly that reason: sending a customer their own data is
+      # the support team's job, and they are the right people to confirm the recipient. The
+      # narrower agent rule (support-remit-004) is what pins it to support staff in practice.
+      - type: human_approval
+        approver_roles: [SupportLead, SecurityAnalyst, TenantAdmin]
+        ttl_seconds: 900
+
+  - id: injection-driven-egress-001
+    description: >
+      The Demo 1 chain. Any external write whose causal history includes untrusted
+      instruction-like content is denied outright, regardless of what is being sent. This is
+      the rule that distinguishes "content looks like an injection" from "an injection
+      actually steered the agent toward an external action".
+    effect: deny
+    severity: critical
+    when:
+      side_effects: [external_write, financial]
+      untrusted_instruction_influence: true
+    reason_codes: [UNTRUSTED_INSTRUCTION_FLOW, TAINTED_DESTINATION]
+    obligations:
+      - type: alert
+        severity: CRITICAL
+
+  - id: untrusted-content-to-memory-001
+    description: >
+      Untrusted instructions must not be persisted into memory, where they would be replayed
+      into a future session's context with laundered provenance.
+    effect: deny
+    severity: high
+    when:
+      action_kinds: [memory_write]
+      taints_any: [UNTRUSTED_INSTRUCTION]
+    reason_codes: [MEMORY_POISONING_ATTEMPT]

@@ -1,0 +1,71 @@
+# Network egress controls.
+#
+# Why: SSRF and exfiltration share a root cause — an agent choosing a destination based on
+# content it read. Hostname allowlisting alone is insufficient (DNS rebinding resolves an
+# allowed name to a private address), so these rules cover both the name and the resolved
+# address; the resolved-address checks are enforced by the SSRF detector and by the gateway,
+# which re-resolves and pins at connect time.
+version: base-network
+description: Outbound network destination and protocol enforcement.
+default_effect: deny
+
+rules:
+  - id: network-scheme-001
+    description: Only HTTPS reaches outside. Plaintext and exotic schemes are denied.
+    effect: deny
+    severity: high
+    when:
+      action_kinds: [network]
+      resources: ["net:*"]
+      untrusted_instruction_influence: true
+    reason_codes: [PROTOCOL_SCHEME_FORBIDDEN, UNTRUSTED_INSTRUCTION_FLOW]
+
+  - id: network-egress-allowlist-001
+    description: >
+      Outbound writes may only reach registered destinations. `destination_not_in` matches
+      when the host is absent or outside the list, so omitting a destination cannot bypass it.
+    effect: deny
+    severity: high
+    when:
+      action_kinds: [network]
+      side_effects: [external_write]
+      destination_not_in:
+        - "mail-provider.example"
+        - "api.ticketing.example"
+        - "*.internal.acme.example"
+    reason_codes: [EGRESS_DESTINATION_FORBIDDEN]
+
+  - id: network-metadata-endpoint-001
+    description: >
+      Cloud instance metadata endpoints hand out workload credentials to anyone who can make
+      an HTTP request from the instance. An agent has no legitimate reason to read them.
+    effect: deny
+    severity: critical
+    when:
+      action_kinds: [network]
+      destination_hosts:
+        - "169.254.169.254"
+        - "metadata.google.internal"
+        - "metadata.goog"
+        - "100.100.100.200"
+        - "fd00:ec2::254"
+    reason_codes: [SSRF_METADATA_ENDPOINT]
+    obligations:
+      - type: alert
+        severity: CRITICAL
+
+  - id: network-loopback-001
+    description: Loopback and link-local destinations reach services that trust the network.
+    effect: deny
+    severity: high
+    when:
+      action_kinds: [network]
+      destination_hosts:
+        - "localhost"
+        - "127.*"
+        - "0.0.0.0"
+        - "[::1]"
+        - "169.254.*"
+        - "*.localhost"
+        - "*.local"
+    reason_codes: [SSRF_PRIVATE_ADDRESS]
