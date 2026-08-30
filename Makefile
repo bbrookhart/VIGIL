@@ -29,7 +29,19 @@ test-rust: ## Run the Rust test suite
 
 .PHONY: test-python
 test-python: $(PY) ## Run the Python SDK tests
-	$(PY) -m pytest sdk/python/tests -q
+	cd sdk/python && .venv/bin/python -m pytest tests -q
+
+.PHONY: test-macos-adapter
+test-macos-adapter: ## Run the native Endpoint Security adapter test suite (macOS only)
+	CLANG_MODULE_CACHE_PATH=/tmp/vigil-clang-modules \
+	SWIFT_MODULE_CACHE_PATH=/tmp/vigil-swift-modules \
+	swift test --disable-sandbox --package-path extensions/endpoint-security
+
+.PHONY: test-macos-network-adapter
+test-macos-network-adapter: ## Run the native Network Extension adapter test suite (macOS only)
+	CLANG_MODULE_CACHE_PATH=/tmp/vigil-network-clang-modules \
+	SWIFT_MODULE_CACHE_PATH=/tmp/vigil-network-swift-modules \
+	swift test --disable-sandbox --package-path extensions/network-filter
 
 .PHONY: test-e2e
 test-e2e: ## Run only the end-to-end gate tests (Gate 1/2, Demos 1-3)
@@ -39,13 +51,17 @@ test-e2e: ## Run only the end-to-end gate tests (Gate 1/2, Demos 1-3)
 test-contract: $(PY) ## Run the cross-language contract tests
 	cargo test -p vigil-common --test canonical_contract
 	cargo test -p vigil-protocol --test sdk_wire_contract
-	$(PY) -m pytest sdk/python/tests/test_canonical_contract.py -q
+	cd sdk/python && .venv/bin/python -m pytest tests/test_canonical_contract.py -q
 
 # ---------------------------------------------------------------- quality gates
 
 .PHONY: verify
 verify: fmt-check lint test ## Everything CI runs
 	@echo "✓ all gates passed"
+
+.PHONY: verify-macos
+verify-macos: verify test-macos-adapter test-macos-network-adapter ## Portable gates plus native macOS adapters
+	@echo "✓ all portable and macOS adapter gates passed"
 
 .PHONY: fmt
 fmt: ## Format Rust sources
@@ -71,6 +87,17 @@ audit-deps: ## Check dependencies for known advisories (requires cargo-audit)
 demo: ## Run the blocked-injection and safe-action demonstrations
 	cargo run -q -p vigil-core --example demo
 
+.PHONY: simulate
+simulate: ## Persist a local blocked credential-read simulation
+	@state_dir="$$(mktemp -d)"; \
+	  cargo run -q -p vigil-cli -- --state-db "$$state_dir/vigil.db" simulate \
+	    --profile developer-standard --workspace "$(CURDIR)" \
+	    --action fs.read --resource "$$HOME/.ssh/id_ed25519"
+
+.PHONY: doctor
+doctor: ## Check portable configuration and the local control-plane posture
+	cargo run -q -p vigil-cli -- doctor
+
 .PHONY: policy-check
 policy-check: ## Validate every shipped policy bundle and remit
 	cargo test -p vigil-policy --test policy_behaviour
@@ -80,6 +107,10 @@ policy-check: ## Validate every shipped policy bundle and remit
 .PHONY: contract-fixtures
 contract-fixtures: $(PY) ## Regenerate the SDK wire fixture consumed by the Rust tests
 	cd $(CURDIR) && $(PY) scripts/generate_wire_fixture.py
+	cargo run -q -p vigil-endpoint --example generate_policy_fixture \
+		> extensions/endpoint-security/Tests/VigilEndpointAdapterTests/Resources/endpoint_policy_v1.json
+	cargo run -q -p vigil-network --example generate_network_policy_fixture \
+		> extensions/network-filter/Tests/VigilNetworkAdapterTests/Resources/network_policy_v1.json
 	@echo "regenerated; run 'make test-contract' to confirm both sides still agree"
 
 # ---------------------------------------------------------------- environment

@@ -8,7 +8,7 @@
 
 [![Rust](https://img.shields.io/badge/Rust-1.82%2B-CE422B?logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-413_passing-2ea44f)](#evidence)
+[![Tests](https://img.shields.io/badge/tests-709_passing-2ea44f)](#evidence)
 [![Clippy](https://img.shields.io/badge/clippy-D_warnings_clean-2ea44f)](#evidence)
 [![unsafe](https://img.shields.io/badge/unsafe-forbidden-2ea44f)](#evidence)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
@@ -27,6 +27,319 @@ read an instruction and followed it. The defensible boundary isn't inside the mo
 between the agent's *intent* and the world's *state*.
 
 VIGIL is that boundary.
+
+---
+
+## Local macOS control plane
+
+VIGIL is expanding from its portable decision/gateway core into a local macOS runtime control
+plane. The first entitlement-independent vertical slice is now available:
+
+```console
+# Inspect the truthful protection posture.
+cargo run -p vigil-cli -- status
+
+# Launch a durable local agent session (currently OBSERVE ONLY at the OS boundary).
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db run \
+  --profile developer-standard --workspace "$PWD" -- /usr/bin/true
+
+# Create a reusable semantic-enforcement session.
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db session start \
+  --profile developer-standard --workspace "$PWD"
+
+# Perform broker-mediated I/O using the returned session ID.
+printf 'managed content' | cargo run -p vigil-cli -- --state-db /tmp/vigil.db \
+  fs write ags_... output.txt
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db \
+  fs read ags_... output.txt > /tmp/output.txt
+# Delete, rename, and list are mediated too, with preimages so `vigil rollback` undoes them.
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db fs delete ags_... output.txt
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db fs rename ags_... old.txt new.txt
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db fs list ags_... .
+
+# Execute a structured, side-effect-free utility with no shell or PATH lookup.
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db \
+  process exec ags_... --program /bin/echo -- 'brokered process output' \
+  > /tmp/process-output.txt
+
+# Resolve, validate, connect, and immediately close without sending application data.
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db \
+  network probe ags_... --host github.com --port 443
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db session budget ags_...
+
+# A capability the profile will not grant on its own raises an approval request, not a
+# dead end. Granting it mints one lease bound to exactly this action and resolved resource.
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db \
+  process exec ags_... --program /usr/bin/uname --discard-output   # REQUIRE_APPROVAL
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db approvals show apr_...
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db \
+  approvals grant apr_... --approver operator --max-uses 1
+
+# Inspect what the session holds, why its risk is where it is, and what it launched.
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db capabilities ags_...
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db risk ags_...
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db processes ags_...
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db events ags_...
+
+# Detections, incidents, containment, and evidence.
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db detections --session ags_...
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db incidents list
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db incidents show inc_...
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db contain ags_... --seal
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db incidents export inc_...
+
+# Recompute the event chain. Editing or deleting a record fails this, non-zero.
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db audit verify-local
+
+# MCP is authorized by its arguments, not by what the tool calls itself.
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db mcp register \
+  --name filesystem --transport stdio --executable /path/to/server
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db mcp sync filesystem --manifest tools.json
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db mcp authorize ags_... \
+  --server filesystem --tool write_file --arguments '{"path":"~/.ssh/config"}'   # DENY
+
+# Compare what the session declared against what an OS observer saw. With nothing
+# watching this reports NO_OBSERVER and exits non-zero — never "consistent".
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db reconcile ags_... --observed observed.json
+
+# Undo the session's broker-mediated writes. Refuses any file something else changed.
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db rollback ags_... --dry-run
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db rollback ags_...
+
+# Place bait that exists only to be touched. Workspace only, never a real credential path.
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db canary place ags_... --kind cloud-credentials
+
+# Git, with the repository's own configuration neutralized so it cannot run programs.
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db git status ags_...
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db git commit ags_... --message "fix"
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db git push ags_... --branch main  # approval
+
+# Analyze stored evidence for shapes that need more than one event to see.
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db analyze ags_...
+
+# Stand between an agent and an MCP server. A refused call never reaches the server.
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db mcp proxy ags_... \
+  --server filesystem -- /path/to/server
+
+# Evaluate a workspace capability without executing it.
+cargo run -p vigil-cli -- policy evaluate \
+  --profile developer-standard --workspace "$PWD" \
+  --action fs.read --resource ~/.ssh/id_ed25519
+
+# Persist the same request as replayable simulation evidence.
+cargo run -p vigil-cli -- --state-db /tmp/vigil.db simulate \
+  --profile developer-standard --workspace "$PWD" \
+  --action fs.read --resource ~/.ssh/id_ed25519
+```
+
+This slice provides high-entropy session identity, process launch lifecycle, SQLite/WAL
+persistence, a normalized event timeline, profile validation, symlink-aware workspace checks,
+default deny, protected-resource denial, transactional blast-radius reservations, atomic managed
+writes, a structured process broker with a cleared environment and bounded output/timeout, a
+payload-free network probe broker with destination-integrity checks and unique-destination
+accounting, a no-disclosure secret-broker interface and deterministic provider simulator,
+content-free broker evidence, and human/JSON CLI output.
+
+It also closes the authority loop. An approval binds `sha256(session, action, resolved resource)`;
+granting one mints exactly one capability lease over that same triple, so the operator decides
+*whether*, never *what*. Leases expire by SQL predicate rather than by a status column — an expired
+lease is inert with no sweeper having run — are use-counted by a single atomic statement, and carry
+a `CHECK(delegable = 0)` that makes non-delegability a property of the database. A lease can raise
+`REQUIRE_APPROVAL` to `ALLOW`; it can never touch a `DENY`.
+
+Session risk is twelve named dimensions and a documented threshold function over them, not one
+opaque score, and it only ever subtracts authority. Repeating a request a human already refused
+loads the policy-evasion dimension until the capability is withheld outright, at which point the
+agent stops reaching the operator at all — approval fatigue is treated as an attack on the human
+rather than as noise. Reaching a containing state revokes outstanding leases in the same
+transaction that records the transition. Every process VIGIL launches becomes a graph node with an
+opaque identity; a partial unique index over live PIDs means a recycled PID becomes a separate node
+instead of inheriting one. See [ADR 0017](docs/adr/0017-approvals-mint-bounded-capability-leases.md),
+[ADR 0018](docs/adr/0018-risk-is-monotone-and-only-subtracts-authority.md), and the
+[fail-closed matrix](docs/security/FAIL_CLOSED_MATRIX.md).
+
+Denials that name a detection produce one, from a fixed catalogue of twelve rules carrying a
+severity and a *separate* confidence, plus the Agentic Runtime Security Tactic they belong to.
+Rules are constants, not a scripting surface. A critical detection — or a session reaching a
+containing risk state — opens an incident; responses are named, idempotent, and recorded even
+when they changed nothing. The event log is hash-chained over canonical bytes, so editing a
+record, deleting one, or reordering two all fail `vigil audit verify-local` with a non-zero exit.
+That is tamper-*evident*, not immutable: anything that can write the database can rewrite the
+whole chain. See [ADR 0019](docs/adr/0019-local-detections-incidents-and-a-tamper-evident-event-chain.md).
+
+MCP is treated as a first-class attack surface. A tool name is a string the server chooses, so
+mapping names to capabilities would fail against the threat it is meant to cover; instead every
+path-like and URL-like argument is extracted and authorized independently through the same path a
+direct broker request takes. One refusal refuses the call. Declared capabilities are compared but
+never grant — a tool declaring everything is still refused when it reaches for a credential.
+Unregistered servers, unknown tools, resource-free calls, and reaches beyond a tool's declaration
+fail closed rather than being permitted by an empty or incomplete resource fold.
+Multi-resource calls preflight first and consume all required leases in one transaction, so a
+later refusal cannot partially burn authority granted to an earlier resource.
+Server identity is the name plus the SHA-256 of its binary, so swapping the program behind a
+trusted name is detectable and quarantines the session on its own. Trusted registration currently
+accepts only local stdio servers with an exact executable path and VIGIL-observed digest; HTTP and
+unknown transports remain refused until they have an authenticated endpoint identity model.
+Drifted observations never overwrite the trusted tool baseline. See
+[ADR 0020](docs/adr/0020-mcp-calls-are-authorized-by-their-arguments.md).
+
+Intent–execution reconciliation compares what a session *declared* against what an OS observer
+*saw*. Five classes separate an incomplete view from a defeated one: `DENIED_OPERATION_OBSERVED`
+means VIGIL refused an operation and it happened anyway — the broker was bypassed — and
+quarantines the session on its own. The decision that keeps this honest is what an empty result
+means: with no extension installed, no observations means nothing was watching, so an unobserved
+session is never reported as consistent and `vigil reconcile` exits non-zero. See
+[ADR 0024](docs/adr/0024-intent-execution-reconciliation.md).
+
+Managed writes are reversible. The broker records the prior content, addressed by hash, and the
+postimage it leaves behind; `vigil rollback` restores them newest-first. It refuses any file that
+changed after VIGIL wrote it — restoring would discard a change VIGIL did not make — and verifies
+a stored blob against its own digest before writing it back. Coverage is exactly as wide as broker
+coverage and every report says so, because observing a write never recovers what preceded it.
+
+Deception places synthetic assets that exist only to be touched, **only** inside the workspace and
+never in a real credential location. The detection fires on an *allowed* read, since a canary is
+an ordinary workspace file, and is rated CRITICAL severity with MEDIUM confidence — a recursive
+search can sweep a workspace, and a detection nobody believes is worse than none. See
+[ADR 0025](docs/adr/0025-broker-mediated-rollback-and-workspace-only-deception.md).
+
+Git gets its own broker, because Git configuration executes programs — `core.pager`,
+`credential.helper`, `filter.*.clean`, every `alias.*`, and hooks all run commands, and an agent
+that can write files can write `.git/config`. In a repository it controls, a plain `git status` is
+a code-execution primitive. Every invocation is built with `-c` overrides applied unconditionally
+(inspecting first would race the file), hooks redirected to an empty directory, and ambient config
+removed. A live test rigs a repository and runs five operations without the payload firing, with a
+control proving the same payload fires when Git is invoked naively. Force-push is denied in every
+enforcing profile; a push is approval-bound and its remote host goes through network policy. See
+[ADR 0026](docs/adr/0026-git-configuration-is-a-code-execution-surface.md).
+
+Some shapes only exist across time: reading credentials and *then* opening a connection,
+archiving before egress, a chain of interpreters, a burst of processes. Each step is individually
+unremarkable and individually decided, so a decision-time rule cannot see them. `vigil analyze`
+runs sequence, threshold, and graph rules over the durable event log and process graph — and is
+explicit that this is retrospective: it explains what a session turned out to be doing rather than
+stopping it. Ordering and proximity are load-bearing (egress *before* a credential read is not
+exfiltration), fan-out is a rate rather than a total, and a cascade is lineage rather than
+adjacency. See [ADR 0028](docs/adr/0028-sequence-threshold-and-graph-detections.md).
+
+Local IPC is treated as part of the credential surface. Protecting `~/.ssh/id_ed25519` is not
+enough if the SSH agent socket lets a caller use those keys without reading a file, and a container
+socket is root-equivalent without any privileged executable or `sudo`. Both are denied in every
+enforcing profile and contain the session on a single occurrence. The protected registry is checked
+against the named path as well as the resolved one, so probing for a socket that is absent still
+fires — the attempt is the signal.
+
+Expiry does not trust the system clock. Leases and approvals compare against
+`max(wall clock, monotone high water)`, so turning the clock back cannot resurrect expired
+authority — the adversarial harness grants a one-second lease, expires it, moves time backwards,
+and asserts the call is still refused *with uses remaining*, so the refusal is about time rather
+than exhaustion. See [ADR 0030](docs/adr/0030-effective-time-only-moves-forward.md).
+
+A path is not an identity. The filesystem broker captures device and inode before opening and
+compares them against the open file handle, so a symlink dropped in place between the decision and
+the open is refused rather than returning content policy never approved — with the event still
+recording the approved path, which would have made the evidence wrong too. Writes recheck the
+parent directory the same way before the rename. This narrows the race to stat-to-open and makes it
+detectable; eliminating decide-to-open needs `openat` and therefore `unsafe`. See
+[ADR 0031](docs/adr/0031-a-path-is-not-an-identity.md).
+
+An executable path is not an executable either. The process broker takes the binary's device,
+inode, and content hash at validation, re-checks the identity immediately before spawning, and
+records the hash in the provenance graph — which had carried an `executable_sha256` field since it
+was built and always written `None`, so the graph recorded paths but never what actually ran. See
+[ADR 0032](docs/adr/0032-an-executable-path-is-not-an-executable.md).
+
+Containment outlives the session. Risk and budgets are per-session, which made shedding
+containment as easy as starting again — a quarantined agent could open a new session on the same
+workspace and immediately write freely. A session created on a workspace contained within the last
+hour now starts `ELEVATED`: mutations need a human, reads still work, and unrelated workspaces are
+untouched. See [ADR 0033](docs/adr/0033-containment-outlives-the-session.md).
+
+Budgets are per-session, which makes the cumulative total unbounded for anyone who can start
+sessions — three sessions on one workspace were measured performing 75 writes against a 25-write
+limit. The per-task model is deliberate, so the control notices the pattern rather than changing
+it: cycling sessions on a workspace fires `VIGIL-L035` carrying the summed consumption, and raises
+the new session to `ELEVATED`. See
+[ADR 0037](docs/adr/0037-session-churn-multiplies-blast-radius.md).
+
+The filesystem capability surface is now complete. `fs.delete`, `fs.rename`, and `fs.list` had
+policy decisions and budget dimensions from the start with no broker behind them — a capability
+with no broker is not a control, and `file_deletes` counted an operation that could not occur. A
+rename is recorded as the two effects it actually is (the destination gains content, the source
+becomes absent), so rollback restores an *overwritten* destination rather than only moving the file
+back. Listing is mediated even though it changes nothing, because enumerating toward a protected
+location is a signal VIGIL previously could not see. See
+[ADR 0038](docs/adr/0038-the-filesystem-capability-surface-is-complete.md).
+
+The Phase 3 foundation is also present: `vigil-endpoint` provides an audit-token keyed,
+deadline-safe authorization fast path and deterministic Endpoint Security simulator. A native
+Swift adapter compiles against the public macOS SDK for `AUTH_EXEC`, `AUTH_OPEN`, `AUTH_CREATE`,
+`AUTH_RENAME`, `AUTH_UNLINK`, fork, and exit. It uses the correct per-event response APIs,
+disables decision caching, and includes a bounded versioned Swift policy/attribution state. It is
+fed only by an instance-bound, expiring Ed25519-signed snapshot that Rust and Swift verify against
+one shared fixture. The native control layer also compiles a strict install/bind/health protocol and
+verifies XPC senders from their kernel-attached audit token and code requirement. It is not an
+installed daemon, registered Mach service, or entitled OS enforcement boundary. A bounded native
+listener lifecycle compiles and a real anonymous-XPC check exercises successful kernel-associated
+peer authentication. Per-peer idle timers prevent connection-slot exhaustion and refresh only
+after code-identity authentication; wrong-identity peers are rejected and disconnected. The
+matching native client bounds every request/reply wait, caps outstanding work, and invalidates
+the channel on timeout with an explicit outcome-unknown error so mutations are not blindly replayed.
+The extension-side control service durably commits a strict generation high-water mark before
+activating or acknowledging policy, preventing signed-snapshot rollback across restart.
+Its authenticated health response also exposes bounded native callback latency, deadline pressure,
+response failures, and sequence-loss counters without performing callback I/O.
+Signed policy expiry is enforced as an exclusive runtime lease: managed authorization fails closed
+after expiry or clock failure, while unrelated host processes remain unaffected.
+The same authenticated protocol can register a managed root using its complete audit token bound
+to the installed policy generation; PID claims and conflicting token reassignment are rejected.
+
+The Phase 4 foundation now has the corresponding network boundary. `vigil-network` signs compact,
+instance-bound destination snapshots, and a public `NEFilterDataProvider` subclass verifies and
+installs them before projecting audit-token-attributed flows into a no-I/O callback state. Exact
+hostname, protocol, port, pinned public address, resolution lease, whole-policy lease, and flow/
+destination budgets are enforced consistently by Rust and Swift checks. The protected policy
+publisher and activatable System Extension are not built, so this does not intercept direct
+sockets yet. See [ADR 0035](docs/adr/0035-network-flow-authority-is-hostname-plus-pinned-address.md),
+[ADR 0036](docs/adr/0036-macos-network-policy-arrives-out-of-band.md), and the
+[Network Extension model](docs/architecture/NETWORK_EXTENSION_MODEL.md).
+
+> [!WARNING]
+> `vigil run` does **not** yet sandbox its child. The filesystem and process brokers enforce
+> operations that actually pass through them, but cannot stop a process from bypassing them.
+> The process broker kills only its direct child on timeout; enforced profiles therefore allow
+> only a tiny exact-path set of side-effect-free utilities while shells and interpreters remain
+> denied. The network probe broker sends no payload and is not a firewall; direct sockets remain
+> bypassable. The secret broker is currently an interface/simulator only—there is no native
+> Keychain provider or CLI use path. The Endpoint Security and Network data-provider adapters
+> compile, but this repository does not yet contain an activatable, signed, entitled System
+> Extension. Until those extensions, authenticated daemon IPC, and entitled release path exist,
+> launched processes retain the user's ambient macOS authority. The CLI reports `OBSERVE ONLY` and never
+> calls this state protected.
+>
+> Approvals are **not** a trust boundary yet. No broker can reach the grant path — the type it
+> requires cannot be constructed from broker code, and a test asserts no broker references it — so
+> a refactor cannot open that path by accident. But with no `vigild` and no authenticated IPC, an
+> agent runs as the same user as the operator and can invoke `vigil approvals grant` itself.
+> Invariant 3, no self-authorization, is not satisfied at the operating-system level.
+>
+> `vigil contain` does **not** terminate anything. Killing a process safely needs certainty that
+> the PID still belongs to the process VIGIL recorded, which requires OS-verified process identity
+> this build does not have. Containment withholds authority from brokered requests; a process
+> already running is unaffected.
+>
+> The MCP stdio proxy mediates traffic explicitly routed through it, binds the launched executable
+> to the registered binary identity, and refuses protected-resource calls before the server sees
+> them. An agent that contacts a server directly remains unmediated.
+>
+> Reconciliation compares two records; it does not produce the second one. Until an entitled
+> System Extension is installed, every reconciliation on a real session reports `NO_OBSERVER`.
+
+See the [local architecture](docs/architecture/ARCHITECTURE.md),
+[Endpoint Security model](docs/architecture/ENDPOINT_SECURITY_MODEL.md),
+[Endpoint policy transport](docs/architecture/ENDPOINT_POLICY_TRANSPORT.md),
+[trust boundaries](docs/security/TRUST_BOUNDARIES.md), and
+[Apple entitlement status](docs/development/APPLE_ENTITLEMENTS.md).
 
 ---
 
@@ -227,14 +540,54 @@ the text. The phrase-matching detector still exists — and is documented in its
 
 ---
 
+## Feature maturity
+
+Every capability, labelled. `STABLE` means tested, documented, and relied upon; `BETA` means it
+works and its edges are still moving; `EXPERIMENTAL` means it is real but young; `PLANNED` means
+it does not exist. Nothing simulated is labelled as enforced, and nothing entitlement-blocked is
+labelled as available.
+
+| Capability | Status | Note |
+|---|---|---|
+| Deterministic policy engine, remits, tool manifests | **STABLE** | 30 rules, behaviourally tested |
+| Canonicalization, capability tokens, audit chain | **STABLE** | cross-language contract vectors |
+| Session identity, SQLite/WAL store, event timeline | **STABLE** | schema 8, forward-only migrations |
+| Blast-radius budgets | **STABLE** | atomic reservation, DB-enforced bounds |
+| Filesystem broker | **BETA** | enforces what routes through it; bypassable |
+| Structured process broker | **BETA** | exact-path allowlist only; kills direct child only |
+| Approvals and capability leases | **BETA** | not an OS-level boundary — see ADR 0017 |
+| Risk engine and degradation | **BETA** | 12 dimensions, monotone |
+| Detections, incidents, responses | **BETA** | 36 rules; no process termination |
+| Sequence, threshold, graph detections | **EXPERIMENTAL** | retrospective; explains, does not block |
+| Release security gates | **STABLE** | §89 conditions as tests, in CI |
+| Tamper-evident event chain | **BETA** | evident, not immutable; no signed checkpoints |
+| Rollback of managed writes and deletes | **BETA** | broker-mediated operations only |
+| Git broker | **BETA** | config neutralized; Git itself unsandboxed |
+| MCP authorization, identity, drift | **BETA** | argument-level authorization, binary identity |
+| MCP stdio proxy | **EXPERIMENTAL** | in the path for traffic routed through it; direct contact unmediated |
+| Network probe broker | **EXPERIMENTAL** | payload-free probe, not a firewall |
+| Network flow fast path and native adapter | **EXPERIMENTAL** | signed pinned-destination policy; provider compiles, not installed |
+| Deception canaries | **EXPERIMENTAL** | workspace-scoped only |
+| Intent–execution reconciliation | **EXPERIMENTAL** | engine works; nothing feeds it |
+| Secret broker | **EXPERIMENTAL** | interface and simulator; no Keychain provider |
+| Endpoint Security fast path and adapter | **EXPERIMENTAL** | compiles; not installed, signed, or entitled |
+| Endpoint System Extension (installable) | **PLANNED** | blocked on Apple entitlement |
+| Network System Extension (installable) | **PLANNED** | data provider compiles; protected distribution/entitlement path required |
+| `vigild` daemon and authenticated IPC | **PLANNED** | protocol compiles; no registered service |
+| SwiftUI Control Center | **PLANNED** | requires full Xcode |
+| Signed audit checkpoints | **PLANNED** | requires a signing identity |
+| Process-tree termination | **PLANNED** | requires OS-verified process identity |
+| Shell broker | **NOT PLANNED** | deliberately excluded; see ADR 0007 |
+
 ## Evidence
 
 | | |
 |---|---|
-| **Tests passing** | **413** — 384 Rust, 29 Python |
+| **Tests passing** | **709** — 680 Rust, 29 Python |
 | **Tests asserting something is *impossible*** | **154** — replay, forgery, mutation, escalation, cross-tenant, impersonation |
 | **Property tests** | algebraic laws over generated inputs, not just examples |
-| **Rust** | 21,728 lines across 12 crates (18,303 source, 3,059 tests) |
+| **Local decision latency** | 18 µs permitted, 273 µs when a detection fires (Apple M2) |
+| **Rust** | 51,917 lines across 15 crates |
 | **Python SDK** | 1,364 lines, **zero runtime dependencies** |
 | **Static analysis** | `clippy -D warnings` clean · `#![forbid(unsafe_code)]` in every crate |
 | **Policy** | 30 rules across 6 shipped bundles, tested against the *real* bundles not fixtures |
@@ -242,7 +595,7 @@ the text. The phrase-matching detector still exists — and is documented in its
 | **Detection quality** | precision 1.000 · recall 0.846 · FPR 0.000 on a held-out corpus with hard negatives |
 | **Failure modes** | the documented fail-closed matrix is mechanically tested, not just written |
 | **Decision latency** | p95 0.105 ms · p99 0.107 ms (Apple M2, in-process, excludes network) |
-| **Fuzzing** | 6 property-asserting targets, 22M+ executions — found 1 real defect |
+| **Fuzzing** | 10 property-asserting targets — found real defects |
 | **Cryptography** | Ed25519 capabilities & approvals, SHA-256 hash-chained audit |
 
 Tests are named for what they prove, not what they touch:
@@ -291,8 +644,9 @@ email. Both the engine and the policy were wrong; both were fixed.
 git clone https://github.com/bbrookhart/VIGIL && cd VIGIL
 
 make demo          # blocked-injection + safe-action demonstrations
-make test          # 345 tests, Rust + Python
+make test          # 709 tests, Rust + Python
 make verify        # fmt + clippy -D warnings + full suite  (what CI would run)
+make verify-macos  # portable gates + native Endpoint Security and Network adapter checks
 ```
 
 No Docker, no services, no network. `make demo` wires Core and Gateway in-process against the
@@ -333,7 +687,19 @@ HTTP servers** · **mTLS/SPIFFE identity** · **`vigil` CLI** · **Helm chart + 
 
 Console UI · Control plane (tenants/OIDC/RBAC/policy lifecycle) · MCP & A2A gateways ·
 TypeScript SDK · ClickHouse/NATS · Terraform · artifact signing & provenance attestation.
-Session state and approvals are still in memory; only audit evidence is durable.
+Portable decision-pipeline session state and approvals are still in memory; local launch
+sessions, semantic broker sessions, normalized event timelines, and budget reservations are
+durable in SQLite. The local secret component is an interface and simulator, not a native
+credential provider. The macOS Endpoint Security fast path and API adapter are built, but System
+Extension packaging, activation, signing, and entitled-device enforcement are not. Network
+Extension, `vigild`, XPC Mach-service registration, and the native Control Center are not yet
+implemented. The Endpoint adapter does contain the bounded listener lifecycle, peer verifier,
+message bridge, and atomic control service they will use. Its anonymous integration check exercises
+a real XPC request, but it is not a signed daemon/System Extension deployment.
+Installed Endpoint policy is also a runtime lease: health becomes unready at its exclusive expiry,
+and attributed processes are denied until a newer valid generation is installed.
+The control service includes strict, generation-bound full-audit-token root registration, but no
+installed daemon currently obtains and submits those tokens.
 
 **Verified vs. written.** Everything above is tested in CI except the Kubernetes bypass proof,
 which needs a cluster: the chart lints and renders, the manifests parse, and
@@ -358,13 +724,14 @@ are in [`docs/operations/benchmarks.md`](docs/operations/benchmarks.md).
 ## Engineering practices on display
 
 - **Type-driven security** — invariants enforced by the compiler, not by review convention
-- **Adversarial testing** — 154 tests asserting attacks *fail*, named for the attack
+- **Adversarial testing** — a harness that *executes* 23 threat-model attack scenarios
+  against disposable fixtures and asserts each fails, named for the attack
 - **Property-based testing** — algebraic laws over generated inputs; found a real forgery primitive
-- **Coverage-guided fuzzing** — 6 targets asserting invariants, not just absence of panics
+- **Coverage-guided fuzzing** — 10 targets asserting invariants, not just absence of panics
 - **Measured, not claimed** — latency and detection quality are benchmarked with documented method
 - **Cross-language contract testing** — two implementations pinned to one spec-derived vector file
 - **Documented failure modes** — every dependency has a written answer to "what if it's down?", resolved against impact tier
-- **Architecture decision records** — [4 ADRs](docs/adr/) with alternatives considered and rejected
+- **Architecture decision records** — [36 ADRs](docs/adr/) with alternatives considered and rejected
 - **Intellectual honesty** — the weakest control is labelled as such *in its own source file*
 
 Every security module carries a `Why / What / Assumptions / Failure mode / Evidence` header.

@@ -220,11 +220,11 @@ impl RuleMatcher {
             return false;
         }
         if !self.paths_outside.is_empty() {
-            let all_inside = req.resource.paths.iter().all(|path| {
-                self.paths_outside
-                    .iter()
-                    .any(|root| path.starts_with(root.as_str()))
-            });
+            let all_inside = req
+                .resource
+                .paths
+                .iter()
+                .all(|path| vigil_common::path::is_inside_any(path, &self.paths_outside));
             if req.resource.paths.is_empty() || all_inside {
                 return false;
             }

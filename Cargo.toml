@@ -13,6 +13,9 @@ members = [
     "crates/vigil-gateway",
     "crates/vigil-identity",
     "crates/vigil-cli",
+    "crates/vigil-local",
+    "crates/vigil-endpoint",
+    "crates/vigil-network",
 ]
 
 [workspace.package]
@@ -35,6 +38,8 @@ vigil-audit = { path = "crates/vigil-audit", version = "0.1.0" }
 vigil-core = { path = "crates/vigil-core", version = "0.1.0" }
 vigil-gateway = { path = "crates/vigil-gateway", version = "0.1.0" }
 vigil-identity = { path = "crates/vigil-identity", version = "0.1.0" }
+vigil-endpoint = { path = "crates/vigil-endpoint", version = "0.1.0" }
+vigil-network = { path = "crates/vigil-network", version = "0.1.0" }
 
 async-trait = "0.1"
 axum = { version = "0.8", features = ["json", "macros"] }
@@ -49,6 +54,7 @@ rand = "0.8"
 rand_core = "0.6"
 regex = "1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+rusqlite = { version = "0.37", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 serde_yaml_ng = "0.10"

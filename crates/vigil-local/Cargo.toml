@@ -1,0 +1,27 @@
+[package]
+name = "vigil-local"
+description = "Durable local sessions and workspace-scoped authorization for VIGIL on macOS."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+vigil-common = { workspace = true }
+
+base64 = { workspace = true }
+chrono = { workspace = true }
+ed25519-dalek = { workspace = true }
+rusqlite = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+url = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "local_authorization"
+harness = false
