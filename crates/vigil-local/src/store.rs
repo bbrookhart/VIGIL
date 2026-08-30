@@ -615,26 +615,1051 @@ impl LocalStore {
             .map_err(storage_error)?;
         drop(statement);
         let mut previous: Option<String> = None;
-        for raw in events {
-            let event = LocalEvent {
-                sequence: raw.sequence,
-                event_id: raw.event_id,
-                timestamp: parse_timestamp(&raw.timestamp).expect("timestamp"),
-                session_id: raw.session_id,
-                category: raw.category,
-                action: "fs.read".to_string(),
-                decision: raw.decision,
-                correlation_id: raw.correlation_id,
-                payload: serde_json::from_str(&raw.payload).expect("payload"),
+        for event in rows {
+            let event = event?;
+            let linked = LocalEvent {
                 previous_hash: previous.clone(),
-                chain_hash: None,
+                ..event
             };
-            let link = event.link_hash().expect("link");
+            let chain_hash = linked.link_hash()?;
+            transaction
+                .execute(
+                    "UPDATE events SET previous_hash = ?1, chain_hash = ?2 WHERE sequence = ?3",
+                    params![previous, chain_hash, linked.sequence],
+                )
+                .map_err(storage_error)?;
+            previous = Some(chain_hash);
+        }
+        transaction.commit().map_err(storage_error)?;
+        Ok(())
+    }
+
+    /// Recompute the chain and report the first record that disagrees with it.
+    pub fn verify_event_chain(&self) -> Result<ChainVerification> {
+        let mut heads = std::collections::HashMap::new();
+        self.walk_event_chain(&std::collections::BTreeSet::new(), &mut heads)
+    }
+
+    /// Recompute the chain, recording the head at each sequence in `wanted`.
+    ///
+    /// The heads are what a checkpoint is compared against: a rewritten log produces
+    /// different link hashes, so its head at a covered sequence no longer matches the one
+    /// that was signed.
+    fn walk_event_chain(
+        &self,
+        wanted: &std::collections::BTreeSet<i64>,
+        heads: &mut std::collections::HashMap<i64, String>,
+    ) -> Result<ChainVerification> {
+        let mut statement = self
+            .connection
+            .prepare(
+                "SELECT sequence, event_id, timestamp, session_id, category, action, decision,
+                        correlation_id, payload_json, previous_hash, chain_hash
+                 FROM events ORDER BY sequence",
+            )
+            .map_err(storage_error)?;
+        let rows = statement
+            .query_map([], event_from_row)
+            .map_err(storage_error)?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(storage_error)?;
+
+        let mut previous_hash: Option<String> = None;
+        let mut previous_sequence: Option<i64> = None;
+        let mut checked = 0usize;
+        for event in rows {
+            let event = event?;
+            checked += 1;
+            if let Some(previous_sequence) = previous_sequence {
+                if event.sequence != previous_sequence + 1 {
+                    return Ok(ChainVerification::failed(
+                        checked,
+                        event.sequence,
+                        format!(
+                            "sequence jumps from {previous_sequence} to {}; \
+                             {} event(s) were removed",
+                            event.sequence,
+                            event.sequence - previous_sequence - 1
+                        ),
+                    ));
+                }
+            }
+            if event.previous_hash != previous_hash {
+                return Ok(ChainVerification::failed(
+                    checked,
+                    event.sequence,
+                    "this event does not link to the one before it".to_string(),
+                ));
+            }
+            let expected = event.link_hash()?;
+            match &event.chain_hash {
+                None => {
+                    return Ok(ChainVerification::failed(
+                        checked,
+                        event.sequence,
+                        "event carries no chain link".to_string(),
+                    ))
+                }
+                Some(stored) if *stored != expected => {
+                    return Ok(ChainVerification::failed(
+                        checked,
+                        event.sequence,
+                        "event content does not match its recorded link".to_string(),
+                    ))
+                }
+                Some(_) => {}
+            }
+            if wanted.contains(&event.sequence) {
+                heads.insert(event.sequence, expected.clone());
+            }
+            previous_hash = Some(expected);
+            previous_sequence = Some(event.sequence);
+        }
+        // A hash chain detects modification and *interior* deletion, but not truncation: if
+        // the last records are removed there is nothing after the break to reveal it. The
+        // adversarial harness found this — `DELETE FROM events WHERE decision = 'DENY'`
+        // removed the newest record and the remaining chain verified cleanly.
+        //
+        // SQLite's `AUTOINCREMENT` high-water mark is not decremented by `DELETE`, so it
+        // still names the highest sequence ever issued. Comparing it against the last record
+        // present detects a truncated tail. An attacker with database write access can also
+        // rewrite `sqlite_sequence`, so this raises the bar rather than closing the door —
+        // which is what "tamper-evident, not immutable" has always meant here. Signed
+        // checkpoints (ADR 0040) are what close it.
+        let high_water: Option<i64> = self
+            .connection
+            .query_row(
+                "SELECT seq FROM sqlite_sequence WHERE name = 'events'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(storage_error)?;
+        if let (Some(high_water), Some(last)) = (high_water, previous_sequence) {
+            if high_water > last {
+                return Ok(ChainVerification::failed(
+                    checked,
+                    last,
+                    format!(
+                        "the log ends at sequence {last} but {high_water} events were \
+                         issued; {} record(s) were removed from the end",
+                        high_water - last
+                    ),
+                ));
+            }
+        }
+        if let (Some(high_water), None) = (high_water, previous_sequence) {
+            // Every record removed, leaving an empty log that would otherwise verify.
+            return Ok(ChainVerification::failed(
+                checked,
+                0,
+                format!("the log is empty but {high_water} event(s) were issued"),
+            ));
+        }
+
+        Ok(ChainVerification {
+            verified: true,
+            events_checked: checked,
+            head: previous_hash,
+            failure: None,
+            checkpoints_checked: 0,
+            checkpoint_failures: Vec::new(),
+        })
+    }
+
+    /// Sign the current chain head and record the commitment.
+    ///
+    /// The chain is verified first and a broken one is refused: signing it would turn a
+    /// rewrite into a signed commitment, which is strictly worse than having no checkpoint.
+    /// An empty log has no head to commit to and is refused for the same reason — a
+    /// checkpoint over nothing would later be indistinguishable from one whose events were
+    /// all removed.
+    pub fn write_checkpoint(
+        &self,
+        signer: &crate::checkpoint::LocalCheckpointSigner,
+        signed_at: vigil_common::Timestamp,
+    ) -> Result<crate::checkpoint::LocalCheckpoint> {
+        let verification = self.verify_event_chain()?;
+        if !verification.verified {
+            let detail = verification
+                .failure
+                .as_ref()
+                .map(|failure| format!("at sequence {}: {}", failure.at_sequence, failure.reason))
+                .unwrap_or_else(|| "chain did not verify".to_string());
+            return Err(VigilError::Config(format!(
+                "refusing to checkpoint a chain that does not verify ({detail})"
+            )));
+        }
+        let (Some(head), Some(sequence)) = (verification.head, self.last_event_sequence()?) else {
+            return Err(VigilError::Config(
+                "refusing to checkpoint an empty event log".to_string(),
+            ));
+        };
+        let checkpoint = signer.sign(sequence, &head, signed_at)?;
+        self.connection
+            .execute(
+                "INSERT OR REPLACE INTO chain_checkpoints
+                   (sequence, head_hash, signed_at, key_id, signature)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![
+                    checkpoint.sequence,
+                    checkpoint.head_hash,
+                    checkpoint.signed_at.to_rfc3339(),
+                    checkpoint.key_id,
+                    checkpoint.signature,
+                ],
+            )
+            .map_err(storage_error)?;
+        Ok(checkpoint)
+    }
+
+    fn last_event_sequence(&self) -> Result<Option<i64>> {
+        self.connection
+            .query_row("SELECT MAX(sequence) FROM events", [], |row| row.get(0))
+            .optional()
+            .map_err(storage_error)
+            .map(Option::flatten)
+    }
+
+    pub fn checkpoints(&self) -> Result<Vec<crate::checkpoint::LocalCheckpoint>> {
+        let mut statement = self
+            .connection
+            .prepare(
+                "SELECT sequence, head_hash, signed_at, key_id, signature
+                 FROM chain_checkpoints ORDER BY sequence",
+            )
+            .map_err(storage_error)?;
+        let rows = statement
+            .query_map([], |row| {
+                let sequence: i64 = row.get(0)?;
+                let head_hash: String = row.get(1)?;
+                let signed_at: String = row.get(2)?;
+                let key_id: String = row.get(3)?;
+                let signature: String = row.get(4)?;
+                Ok((sequence, head_hash, signed_at, key_id, signature))
+            })
+            .map_err(storage_error)?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(storage_error)?;
+        rows.into_iter()
+            .map(|(sequence, head_hash, signed_at, key_id, signature)| {
+                Ok(crate::checkpoint::LocalCheckpoint {
+                    sequence,
+                    head_hash,
+                    signed_at: parse_timestamp(&signed_at).map_err(storage_error)?,
+                    key_id,
+                    signature,
+                })
+            })
+            .collect()
+    }
+
+    /// Recompute the chain and hold it against every signed checkpoint.
+    ///
+    /// This is the check that detects a wholesale rewrite. The link-by-link walk alone
+    /// cannot: an attacker with database write access can recompute every link from their
+    /// own version of history. What they cannot do, without the signing key, is produce a
+    /// checkpoint whose signed head matches that rewrite.
+    pub fn verify_event_chain_with_checkpoints(
+        &self,
+        verifier: &crate::checkpoint::LocalCheckpointVerifier,
+    ) -> Result<ChainVerification> {
+        let checkpoints = self.checkpoints()?;
+        let wanted: std::collections::BTreeSet<i64> =
+            checkpoints.iter().map(|point| point.sequence).collect();
+        let mut heads = std::collections::HashMap::new();
+        let mut verification = self.walk_event_chain(&wanted, &mut heads)?;
+
+        let last_sequence = self.last_event_sequence()?;
+        let mut failures = Vec::new();
+        for checkpoint in &checkpoints {
+            // Check the signature first. An unsigned or forged checkpoint says nothing about
+            // the log, so comparing its head would report a misleading reason.
+            if let Some(failure) = verifier.check(checkpoint) {
+                failures.push((checkpoint.sequence, failure));
+                continue;
+            }
+            match heads.get(&checkpoint.sequence) {
+                Some(recomputed) if *recomputed == checkpoint.head_hash => {}
+                Some(recomputed) => failures.push((
+                    checkpoint.sequence,
+                    crate::checkpoint::CheckpointFailure::HeadMismatch {
+                        signed: checkpoint.head_hash.clone(),
+                        recomputed: recomputed.clone(),
+                    },
+                )),
+                None => failures.push((
+                    checkpoint.sequence,
+                    crate::checkpoint::CheckpointFailure::TruncatedBelowCheckpoint {
+                        last_sequence: last_sequence.unwrap_or(0),
+                    },
+                )),
+            }
+        }
+
+        verification.checkpoints_checked = checkpoints.len();
+        if !failures.is_empty() {
+            // A chain whose links are individually consistent is still not trustworthy if a
+            // checkpoint disagrees with it.
+            verification.verified = false;
+            verification.checkpoint_failures = failures;
+        }
+        Ok(verification)
+    }
+
+    pub fn events_for_session(&self, session_id: &str) -> Result<Vec<LocalEvent>> {
+        let mut statement = self
+            .connection
+            .prepare(
+                "SELECT sequence, event_id, timestamp, session_id, category, action, decision,
+                        correlation_id, payload_json, previous_hash, chain_hash
+                 FROM events WHERE session_id = ?1 ORDER BY sequence",
+            )
+            .map_err(storage_error)?;
+        let rows = statement
+            .query_map([session_id], event_from_row)
+            .map_err(storage_error)?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(storage_error)?;
+        rows.into_iter().collect()
+    }
+
+    /// Apply an UPDATE that must affect exactly one row.
+    ///
+    /// A state transition that silently matched nothing would leave the caller believing a
+    /// session was running, sealed or finished when it was not.
+    fn update_exactly_one(&self, sql: &str, params: impl rusqlite::Params) -> Result<()> {
+        let changed = self
+            .connection
+            .execute(sql, params)
+            .map_err(storage_error)?;
+        if changed == 1 {
+            Ok(())
+        } else {
+            Err(VigilError::Config(format!(
+                "expected to update exactly one row, updated {changed}"
+            )))
+        }
+    }
+
+    /// Forward-only schema migration.
+    ///
+    /// Every step is additive and runs inside its own transaction, so an interrupted upgrade
+    /// leaves the database at a version that is still coherent. There is no downgrade path:
+    /// a database from a newer VIGIL is refused rather than silently reinterpreted.
+    fn migrate(&self) -> Result<()> {
+        let current = self.schema_version()?;
+        if current > SCHEMA_VERSION {
+            return Err(VigilError::Config(format!(
+                "local database schema {current} is newer than supported schema \
+                 {SCHEMA_VERSION}; refusing to downgrade it"
+            )));
+        }
+        if current < 1 {
+            self.connection
+                .execute_batch(
+                    "BEGIN IMMEDIATE;
+                 CREATE TABLE IF NOT EXISTS sessions (
+                   id TEXT PRIMARY KEY,
+                   created_at TEXT NOT NULL,
+                   ended_at TEXT,
+                   profile TEXT NOT NULL,
+                   workspace TEXT NOT NULL,
+                   executable TEXT NOT NULL,
+                   argv_json TEXT NOT NULL,
+                   task TEXT,
+                   enforcement_posture TEXT NOT NULL,
+                   status TEXT NOT NULL,
+                   pid INTEGER,
+                   exit_code INTEGER,
+                   risk_state TEXT NOT NULL
+                 );
+                 CREATE TABLE IF NOT EXISTS events (
+                   sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+                   event_id TEXT NOT NULL UNIQUE,
+                   timestamp TEXT NOT NULL,
+                   session_id TEXT NOT NULL REFERENCES sessions(id),
+                   category TEXT NOT NULL,
+                   action TEXT NOT NULL,
+                   decision TEXT,
+                   correlation_id TEXT NOT NULL,
+                   payload_json TEXT NOT NULL
+                 );
+                 CREATE INDEX IF NOT EXISTS events_session_sequence
+                   ON events(session_id, sequence);
+                 CREATE INDEX IF NOT EXISTS events_timestamp ON events(timestamp);
+                 CREATE INDEX IF NOT EXISTS events_decision ON events(decision);
+                 CREATE INDEX IF NOT EXISTS events_correlation ON events(correlation_id);
+                 PRAGMA user_version = 1;
+                 COMMIT;",
+                )
+                .map_err(storage_error)?;
+        }
+        if self.schema_version()? < 2 {
+            // Budgets are reserved then committed in one `BEGIN IMMEDIATE` transaction, with
+            // the arithmetic constrained by the database rather than by the caller: a
+            // reservation that would exceed the limit cannot be written at all (ADR 0006).
+            self.connection
+                .execute_batch(
+                    "BEGIN IMMEDIATE;
+                     CREATE TABLE IF NOT EXISTS budget_counters (
+                       session_id TEXT NOT NULL REFERENCES sessions(id),
+                       dimension TEXT NOT NULL,
+                       limit_value INTEGER NOT NULL CHECK(limit_value >= 0),
+                       consumed INTEGER NOT NULL CHECK(consumed >= 0),
+                       reserved INTEGER NOT NULL CHECK(reserved >= 0),
+                       PRIMARY KEY(session_id, dimension),
+                       CHECK(consumed + reserved <= limit_value)
+                     );
+                     CREATE TABLE IF NOT EXISTS budget_reservations (
+                       id TEXT PRIMARY KEY,
+                       session_id TEXT NOT NULL REFERENCES sessions(id),
+                       correlation_id TEXT NOT NULL,
+                       created_at TEXT NOT NULL,
+                       status TEXT NOT NULL CHECK(status IN ('pending', 'committed', 'refunded'))
+                     );
+                     CREATE TABLE IF NOT EXISTS budget_reservation_items (
+                       reservation_id TEXT NOT NULL REFERENCES budget_reservations(id),
+                       dimension TEXT NOT NULL,
+                       amount INTEGER NOT NULL CHECK(amount > 0),
+                       PRIMARY KEY(reservation_id, dimension)
+                     );
+                     CREATE INDEX IF NOT EXISTS budget_reservations_session
+                       ON budget_reservations(session_id, created_at);
+                     PRAGMA user_version = 2;
+                     COMMIT;",
+                )
+                .map_err(storage_error)?;
+        }
+        if self.schema_version()? < 3 {
+            // A destination is claimed once per session and charged once, so repeated
+            // connections to an already-approved host do not drain the budget.
+            self.connection
+                .execute_batch(
+                    "BEGIN IMMEDIATE;
+                     CREATE TABLE IF NOT EXISTS network_destination_claims (
+                       session_id TEXT NOT NULL REFERENCES sessions(id),
+                       destination_key TEXT NOT NULL,
+                       reservation_id TEXT NOT NULL UNIQUE REFERENCES budget_reservations(id),
+                       status TEXT NOT NULL CHECK(status IN ('pending', 'committed')),
+                       PRIMARY KEY(session_id, destination_key)
+                     );
+                     CREATE INDEX IF NOT EXISTS network_destination_claims_reservation
+                       ON network_destination_claims(reservation_id);
+                     PRAGMA user_version = 3;
+                     COMMIT;",
+                )
+                .map_err(storage_error)?;
+        }
+        if self.schema_version()? < 4 {
+            // The authority loop: an approval-bound request becomes a specific, expiring,
+            // use-bounded lease, risk becomes an input that can only subtract authority, and
+            // process lineage becomes durable (ADR 0017, ADR 0018).
+            //
+            // `delegable` is pinned to 0 by a CHECK so non-delegability is a database
+            // invariant rather than a code convention, and `processes_live_pid` is the
+            // PID-reuse defence: a live pid is unique per session, and a recycled one can
+            // only be inserted once the prior node is closed.
+            self.connection
+                .execute_batch(
+                    "BEGIN IMMEDIATE;
+                     CREATE TABLE IF NOT EXISTS approval_requests (
+                       approval_id TEXT PRIMARY KEY,
+                       session_id TEXT NOT NULL REFERENCES sessions(id),
+                       requested_at TEXT NOT NULL,
+                       expires_at TEXT NOT NULL,
+                       action TEXT NOT NULL,
+                       requested_resource TEXT NOT NULL,
+                       resolved_resource TEXT NOT NULL,
+                       determining_policy TEXT NOT NULL,
+                       reason TEXT NOT NULL,
+                       risk_state_at_request TEXT NOT NULL,
+                       fingerprint TEXT NOT NULL,
+                       status TEXT NOT NULL
+                         CHECK(status IN ('pending', 'granted', 'denied')),
+                       decided_at TEXT,
+                       decided_by TEXT,
+                       note TEXT,
+                       lease_id TEXT
+                     );
+                     CREATE UNIQUE INDEX IF NOT EXISTS approval_requests_live
+                       ON approval_requests(session_id, fingerprint) WHERE status = 'pending';
+                     CREATE INDEX IF NOT EXISTS approval_requests_session
+                       ON approval_requests(session_id, requested_at);
+                     CREATE INDEX IF NOT EXISTS approval_requests_fingerprint
+                       ON approval_requests(session_id, fingerprint, status);
+                     CREATE TABLE IF NOT EXISTS capability_leases (
+                       lease_id TEXT PRIMARY KEY,
+                       session_id TEXT NOT NULL REFERENCES sessions(id),
+                       approval_id TEXT NOT NULL
+                         REFERENCES approval_requests(approval_id),
+                       action TEXT NOT NULL,
+                       resource TEXT NOT NULL,
+                       issued_at TEXT NOT NULL,
+                       expires_at TEXT NOT NULL,
+                       max_uses INTEGER NOT NULL CHECK(max_uses > 0),
+                       uses_remaining INTEGER NOT NULL
+                         CHECK(uses_remaining >= 0 AND uses_remaining <= max_uses),
+                       delegable INTEGER NOT NULL CHECK(delegable = 0),
+                       status TEXT NOT NULL
+                         CHECK(status IN ('active', 'exhausted', 'revoked')),
+                       revoked_at TEXT,
+                       revocation_reason TEXT
+                     );
+                     CREATE INDEX IF NOT EXISTS capability_leases_lookup
+                       ON capability_leases(session_id, action, resource, status);
+                     CREATE INDEX IF NOT EXISTS capability_leases_approval
+                       ON capability_leases(approval_id);
+                     CREATE TABLE IF NOT EXISTS risk_signals (
+                       id TEXT PRIMARY KEY,
+                       session_id TEXT NOT NULL REFERENCES sessions(id),
+                       at TEXT NOT NULL,
+                       dimension TEXT NOT NULL,
+                       weight INTEGER NOT NULL CHECK(weight > 0),
+                       source_event_id TEXT,
+                       note TEXT NOT NULL
+                     );
+                     CREATE INDEX IF NOT EXISTS risk_signals_session
+                       ON risk_signals(session_id, dimension);
+                     CREATE TABLE IF NOT EXISTS risk_transitions (
+                       id TEXT PRIMARY KEY,
+                       session_id TEXT NOT NULL REFERENCES sessions(id),
+                       at TEXT NOT NULL,
+                       previous_state TEXT NOT NULL,
+                       new_state TEXT NOT NULL,
+                       triggering_signals_json TEXT NOT NULL
+                     );
+                     CREATE INDEX IF NOT EXISTS risk_transitions_session
+                       ON risk_transitions(session_id, at);
+                     CREATE TABLE IF NOT EXISTS processes (
+                       node_id TEXT PRIMARY KEY,
+                       session_id TEXT NOT NULL REFERENCES sessions(id),
+                       parent_node_id TEXT REFERENCES processes(node_id),
+                       pid INTEGER NOT NULL,
+                       started_at TEXT NOT NULL,
+                       exited_at TEXT,
+                       executable TEXT NOT NULL,
+                       executable_sha256 TEXT,
+                       argv_json TEXT NOT NULL,
+                       generation INTEGER NOT NULL CHECK(generation >= 0),
+                       exit_code INTEGER,
+                       status TEXT NOT NULL
+                         CHECK(status IN ('running', 'exited', 'terminated', 'unknown'))
+                     );
+                     CREATE UNIQUE INDEX IF NOT EXISTS processes_live_pid
+                       ON processes(session_id, pid) WHERE exited_at IS NULL;
+                     CREATE INDEX IF NOT EXISTS processes_session
+                       ON processes(session_id, started_at);
+                     CREATE INDEX IF NOT EXISTS processes_parent ON processes(parent_node_id);
+                     PRAGMA user_version = 4;
+                     COMMIT;",
+                )
+                .map_err(storage_error)?;
+        }
+        if self.schema_version()? < 5 {
+            // Detections and the incident they roll up into. At most one incident is open per
+            // session, enforced by a partial unique index rather than by the caller checking
+            // first and racing.
+            self.connection
+                .execute_batch(
+                    "BEGIN IMMEDIATE;
+                     CREATE TABLE IF NOT EXISTS detections (
+                       detection_id TEXT PRIMARY KEY,
+                       session_id TEXT NOT NULL REFERENCES sessions(id),
+                       at TEXT NOT NULL,
+                       rule_id TEXT NOT NULL,
+                       name TEXT NOT NULL,
+                       severity TEXT NOT NULL
+                         CHECK(severity IN ('INFO','LOW','MEDIUM','HIGH','CRITICAL')),
+                       confidence TEXT NOT NULL
+                         CHECK(confidence IN ('LOW','MEDIUM','HIGH')),
+                       tactic TEXT NOT NULL,
+                       description TEXT NOT NULL,
+                       evidence_json TEXT NOT NULL,
+                       source_event_id TEXT,
+                       incident_id TEXT
+                     );
+                     CREATE INDEX IF NOT EXISTS detections_session ON detections(session_id, at);
+                     CREATE INDEX IF NOT EXISTS detections_rule ON detections(rule_id);
+                     CREATE TABLE IF NOT EXISTS incidents (
+                       incident_id TEXT PRIMARY KEY,
+                       session_id TEXT NOT NULL REFERENCES sessions(id),
+                       opened_at TEXT NOT NULL,
+                       sealed_at TEXT,
+                       severity TEXT NOT NULL
+                         CHECK(severity IN ('INFO','LOW','MEDIUM','HIGH','CRITICAL')),
+                       status TEXT NOT NULL CHECK(status IN ('open','sealed')),
+                       reason TEXT NOT NULL,
+                       risk_state_at_open TEXT NOT NULL
+                     );
+                     CREATE UNIQUE INDEX IF NOT EXISTS incidents_open_per_session
+                       ON incidents(session_id) WHERE status = 'open';
+                     CREATE INDEX IF NOT EXISTS incidents_session
+                       ON incidents(session_id, opened_at);
+                     CREATE TABLE IF NOT EXISTS incident_responses (
+                       id TEXT PRIMARY KEY,
+                       incident_id TEXT NOT NULL REFERENCES incidents(incident_id),
+                       at TEXT NOT NULL,
+                       action TEXT NOT NULL,
+                       outcome TEXT NOT NULL
+                         CHECK(outcome IN ('applied','already_applied','refused')),
+                       detail_json TEXT NOT NULL
+                     );
+                     CREATE INDEX IF NOT EXISTS incident_responses_incident
+                       ON incident_responses(incident_id, at);
+                     PRAGMA user_version = 5;
+                     COMMIT;",
+                )
+                .map_err(storage_error)?;
+        }
+        if self.schema_version()? < 6 {
+            // MCP servers and the tools they advertise. Recording the schema and description
+            // hashes is what makes a tool's definition changing under a live session
+            // detectable rather than invisible.
+            self.connection
+                .execute_batch(
+                    "BEGIN IMMEDIATE;
+                     CREATE TABLE IF NOT EXISTS mcp_servers (
+                       server_id TEXT PRIMARY KEY,
+                       name TEXT NOT NULL UNIQUE,
+                       transport TEXT NOT NULL
+                         CHECK(transport IN ('stdio', 'http', 'unknown')),
+                       executable TEXT,
+                       executable_sha256 TEXT,
+                       version TEXT,
+                       first_seen TEXT NOT NULL,
+                       last_seen TEXT NOT NULL,
+                       trust_state TEXT NOT NULL
+                         CHECK(trust_state IN ('trusted', 'quarantined'))
+                     );
+                     CREATE TABLE IF NOT EXISTS mcp_tools (
+                       server_id TEXT NOT NULL REFERENCES mcp_servers(server_id),
+                       tool_name TEXT NOT NULL,
+                       schema_hash TEXT NOT NULL,
+                       description_hash TEXT NOT NULL,
+                       declared_capabilities_json TEXT NOT NULL,
+                       first_seen TEXT NOT NULL,
+                       last_seen TEXT NOT NULL,
+                       PRIMARY KEY(server_id, tool_name)
+                     );
+                     CREATE INDEX IF NOT EXISTS mcp_tools_server ON mcp_tools(server_id);
+                     PRAGMA user_version = 6;
+                     COMMIT;",
+                )
+                .map_err(storage_error)?;
+        }
+        if self.schema_version()? < 7 {
+            // Rollback preimages and canaries. A preimage is content-addressed, so restoring
+            // is a check that the file is still what VIGIL left, not a blind overwrite.
+            self.connection
+                .execute_batch(
+                    "BEGIN IMMEDIATE;
+                     CREATE TABLE IF NOT EXISTS write_preimages (
+                       preimage_id TEXT PRIMARY KEY,
+                       session_id TEXT NOT NULL REFERENCES sessions(id),
+                       at TEXT NOT NULL,
+                       resource TEXT NOT NULL,
+                       prior_state TEXT NOT NULL
+                         CHECK(prior_state IN ('existing', 'absent')),
+                       blob_sha256 TEXT,
+                       blob_bytes INTEGER,
+                       preserved INTEGER NOT NULL CHECK(preserved IN (0, 1)),
+                       unpreserved_reason TEXT,
+                       postimage_sha256 TEXT NOT NULL,
+                       postimage_bytes INTEGER NOT NULL,
+                       event_id TEXT,
+                       restored_at TEXT,
+                       CHECK(prior_state = 'absent' OR preserved = 0 OR blob_sha256 IS NOT NULL)
+                     );
+                     CREATE INDEX IF NOT EXISTS write_preimages_session
+                       ON write_preimages(session_id, at);
+                     CREATE INDEX IF NOT EXISTS write_preimages_resource
+                       ON write_preimages(session_id, resource);
+                     CREATE TABLE IF NOT EXISTS canaries (
+                       canary_id TEXT PRIMARY KEY,
+                       session_id TEXT NOT NULL REFERENCES sessions(id),
+                       path TEXT NOT NULL UNIQUE,
+                       kind TEXT NOT NULL,
+                       content_sha256 TEXT NOT NULL,
+                       placed_at TEXT NOT NULL,
+                       removed_at TEXT
+                     );
+                     CREATE INDEX IF NOT EXISTS canaries_session ON canaries(session_id);
+                     PRAGMA user_version = 7;
+                     COMMIT;",
+                )
+                .map_err(storage_error)?;
+        }
+        if self.schema_version()? < 8 {
+            // The hash chain over the event log (ADR 0019). The columns are added first, then
+            // every pre-existing event is linked, so a database that predates the chain
+            // becomes verifiable rather than permanently unverifiable.
+            self.add_event_chain_columns()?;
+            self.backfill_event_chain()?;
+            self.connection
+                .execute_batch("PRAGMA user_version = 8;")
+                .map_err(storage_error)?;
+        }
+        if self.schema_version()? < 9 {
+            // Leases and approvals expire by comparing `expires_at` to the wall clock. That is
+            // correct only while the clock moves forward: a backwards jump would make an
+            // already-expired lease valid again, which is authority resurrected by changing a
+            // setting. §71 says not to rely on wall time alone for security intervals, and
+            // ADR 0012 already records this gap on the native side.
+            self.connection
+                .execute_batch(
+                    "BEGIN IMMEDIATE;
+                     CREATE TABLE clock_state (
+                       id INTEGER PRIMARY KEY CHECK(id = 1),
+                       high_water TEXT NOT NULL
+                     );
+                     PRAGMA user_version = 9;
+                     COMMIT;",
+                )
+                .map_err(storage_error)?;
+        }
+        if self.schema_version()? < 10 {
+            // A deletion's result is absence, which the preimage record could not express: it
+            // assumed every managed operation left content behind. Without this a delete
+            // could be captured but never safely restored, because the "is the file still
+            // what VIGIL left?" check had no way to mean "still gone".
+            self.connection
+                .execute_batch(
+                    "BEGIN IMMEDIATE;
+                     ALTER TABLE write_preimages ADD COLUMN postimage_state TEXT NOT NULL
+                       DEFAULT 'present';
+                     PRAGMA user_version = 10;
+                     COMMIT;",
+                )
+                .map_err(storage_error)?;
+        }
+        if self.schema_version()? < 11 {
+            // `fs.rename` was in the capability vocabulary from the start with no counter
+            // behind it. A missing counter denies, which is safe but unexplained for a
+            // session that predates the dimension.
+            self.backfill_budget_dimensions(&[crate::BudgetDimension::FileRenames])?;
+            self.connection
+                .execute_batch("PRAGMA user_version = 11;")
+                .map_err(storage_error)?;
+        }
+        if self.schema_version()? < 12 {
+            // A hash chain makes an edit evident but not a rewrite: anything that can write
+            // the database can recompute every link and reset `sqlite_sequence` to match.
+            // Checkpoints sign the head with a key held outside the database, so a rewrite
+            // can no longer be made self-consistent. See ADR 0040.
+            self.connection
+                .execute_batch(
+                    "BEGIN IMMEDIATE;
+                     CREATE TABLE chain_checkpoints (
+                       sequence INTEGER PRIMARY KEY,
+                       head_hash TEXT NOT NULL,
+                       signed_at TEXT NOT NULL,
+                       key_id TEXT NOT NULL,
+                       signature TEXT NOT NULL
+                     );
+                     PRAGMA user_version = 12;
+                     COMMIT;",
+                )
+                .map_err(storage_error)?;
+        }
+        let version = self.schema_version()?;
+        if version != SCHEMA_VERSION {
+            return Err(VigilError::Config(format!(
+                "unsupported local database schema {version}; expected {SCHEMA_VERSION}"
+            )));
+        }
+        Ok(())
+    }
+
+    /// Add the chain columns if they are not already present.
+    ///
+    /// `ALTER TABLE ... ADD COLUMN` has no `IF NOT EXISTS` in SQLite, so the column list is
+    /// consulted first. Re-running a migration must never be an error.
+    fn add_event_chain_columns(&self) -> Result<()> {
+        let mut statement = self
+            .connection
+            .prepare("SELECT name FROM pragma_table_info('events')")
+            .map_err(storage_error)?;
+        let columns = statement
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(storage_error)?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(storage_error)?;
+        drop(statement);
+        for column in ["previous_hash", "chain_hash"] {
+            if !columns.iter().any(|name| name == column) {
+                self.connection
+                    .execute_batch(&format!("ALTER TABLE events ADD COLUMN {column} TEXT;"))
+                    .map_err(storage_error)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Map a SQLite failure into VIGIL's error type.
+///
+/// Storage being unavailable is a fail-closed condition, not something a caller may ignore:
+/// a decision that cannot be recorded is a decision that cannot be made.
+pub(crate) fn storage_error(error: rusqlite::Error) -> VigilError {
+    VigilError::Unavailable {
+        component: "local_sqlite",
+        reason: error.to_string(),
+    }
+}
+
+/// Restrict a path to its owner.
+///
+/// The database holds the record of every decision VIGIL made. A world-readable copy would
+/// leak the workspace layout, the commands run, and the resources touched.
+fn set_owner_only(path: &Path, is_directory: bool) -> Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = if is_directory { 0o700 } else { 0o600 };
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode))?;
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (path, is_directory);
+    }
+    Ok(())
+}
+
+fn parse_timestamp(value: &str) -> rusqlite::Result<DateTime<Utc>> {
+    DateTime::parse_from_rfc3339(value)
+        .map(|parsed| parsed.with_timezone(&Utc))
+        .map_err(|error| {
+            rusqlite::Error::FromSqlConversionFailure(
+                0,
+                rusqlite::types::Type::Text,
+                Box::new(error),
+            )
+        })
+}
+
+fn session_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<LocalSession> {
+    let created_at: String = row.get(1)?;
+    let ended_at: Option<String> = row.get(2)?;
+    let argv_json: String = row.get(6)?;
+    let status: String = row.get(9)?;
+    let pid: Option<i64> = row.get(10)?;
+    Ok(LocalSession {
+        id: row.get(0)?,
+        created_at: parse_timestamp(&created_at)?,
+        ended_at: ended_at.as_deref().map(parse_timestamp).transpose()?,
+        profile: row.get(3)?,
+        workspace: row.get(4)?,
+        executable: row.get(5)?,
+        argv: serde_json::from_str(&argv_json).unwrap_or_default(),
+        task: row.get(7)?,
+        enforcement_posture: row.get(8)?,
+        status: SessionStatus::parse(&status).map_err(|error| {
+            rusqlite::Error::FromSqlConversionFailure(
+                9,
+                rusqlite::types::Type::Text,
+                Box::new(error),
+            )
+        })?,
+        pid: pid.and_then(|value| u32::try_from(value).ok()),
+        exit_code: row.get(11)?,
+        risk_state: row.get(12)?,
+    })
+}
+
+/// Read one event row.
+///
+/// The raw column reads happen before the `LocalEvent` is assembled because the payload parse
+/// returns a `VigilError`, which cannot be produced from inside a closure that must return a
+/// `rusqlite::Error`. The nested `Result` is that distinction made explicit.
+fn event_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Result<LocalEvent>> {
+    let sequence: i64 = row.get(0)?;
+    let event_id: String = row.get(1)?;
+    let timestamp: String = row.get(2)?;
+    let session_id: String = row.get(3)?;
+    let category: String = row.get(4)?;
+    let action: String = row.get(5)?;
+    let decision: Option<String> = row.get(6)?;
+    let correlation_id: String = row.get(7)?;
+    let payload_json: String = row.get(8)?;
+    let previous_hash: Option<String> = row.get(9)?;
+    let chain_hash: Option<String> = row.get(10)?;
+    let timestamp = parse_timestamp(&timestamp)?;
+    Ok(serde_json::from_str(&payload_json)
+        .map_err(VigilError::from)
+        .map(|payload| LocalEvent {
+            sequence,
+            event_id,
+            timestamp,
+            session_id,
+            category,
+            action,
+            decision,
+            correlation_id,
+            payload,
+            previous_hash,
+            chain_hash,
+        }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn store() -> (PathBuf, LocalStore) {
+        let root = std::env::temp_dir().join(format!("vigil-store-{}", uuid::Uuid::new_v4()));
+        let store = LocalStore::open(&root.join("vigil.db")).expect("open store");
+        (root, store)
+    }
+
+    fn request() -> NewSession {
+        NewSession {
+            profile: "developer-standard".to_string(),
+            workspace: std::env::temp_dir().join("vigil-workspace"),
+            executable: "/usr/bin/env".to_string(),
+            argv: vec!["env".to_string()],
+            task: Some("test".to_string()),
+            enforcement_posture: "semantic_enforced".to_string(),
+        }
+    }
+
+    #[test]
+    fn sessions_and_events_survive_reopen() {
+        // Ended sessions stay queryable and events are append-oriented: correctness never
+        // depends on a cleanup job having run, or not having run.
+        let (root, store) = store();
+        let session = store.create_session(&request()).expect("create session");
+        store
+            .append_event(
+                &session.id,
+                "lifecycle",
+                "session.start",
+                None,
+                "corr-1",
+                &serde_json::json!({ "profile": session.profile }),
+            )
+            .expect("append event");
+        let path = store.path().to_path_buf();
+        drop(store);
+
+        let reopened = LocalStore::open(&path).expect("reopen store");
+        let recovered = reopened
+            .get_session(&session.id)
+            .expect("load session")
+            .expect("session survived");
+        assert_eq!(recovered.id, session.id);
+        assert_eq!(recovered.status, SessionStatus::Starting);
+        let events = reopened
+            .events_for_session(&session.id)
+            .expect("events survived");
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].action, "session.start");
+        assert!(reopened.verify_event_chain().expect("verify").verified);
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn event_for_unknown_session_fails_closed() {
+        // An event that cannot be attributed to a session is indistinguishable from an
+        // injected one, so the foreign key refuses it rather than recording it loose.
+        let (root, store) = store();
+        assert!(store
+            .append_event(
+                "ags_does_not_exist",
+                "filesystem",
+                "fs.read",
+                Some("ALLOW"),
+                "corr-1",
+                &serde_json::json!({}),
+            )
+            .is_err());
+        assert!(store.verify_event_chain().expect("verify").verified);
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn command_arguments_are_redacted_before_persistence() {
+        // Arguments routinely carry inline tokens. Lifecycle evidence records that an
+        // argument was present, never its value — argv[0] is the executable and is excerpted
+        // rather than redacted, because the command being run is the point of the record.
+        let (root, store) = store();
+        let mut request = request();
+        request.argv = vec![
+            "deploy".to_string(),
+            "--token=secret-token-value".to_string(),
+        ];
+        let session = store.create_session(&request).expect("create session");
+        let rendered = serde_json::to_string(&session.argv).expect("serialize argv");
+        assert!(!rendered.contains("secret-token-value"));
+        assert!(rendered.contains("redacted"));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    // MARK: signed checkpoints
+
+    fn checkpoint_signer() -> crate::checkpoint::LocalCheckpointSigner {
+        crate::checkpoint::LocalCheckpointSigner::from_seed("local-1", &[7u8; 32]).expect("signer")
+    }
+
+    fn checkpoint_verifier() -> crate::checkpoint::LocalCheckpointVerifier {
+        crate::checkpoint::LocalCheckpointVerifier::new()
+            .trust_key("local-1", checkpoint_signer().verifying_key())
+    }
+
+    /// A store with a session and `count` events, chain intact.
+    fn store_with_events(count: usize) -> (PathBuf, LocalStore, String) {
+        let (root, store) = store();
+        let session = store.create_session(&request()).expect("create session");
+        for index in 0..count {
+            store
+                .append_event(
+                    &session.id,
+                    "filesystem",
+                    "fs.read",
+                    Some("ALLOW"),
+                    &format!("corr-{index}"),
+                    &serde_json::json!({ "index": index }),
+                )
+                .expect("append event");
+        }
+        (root, store, session.id)
+    }
+
+    /// Recompute every link hash so the whole chain is internally consistent again.
+    ///
+    /// This is what an attacker with database write access can do, and it is precisely what
+    /// the link-by-link walk cannot detect.
+    fn rewrite_chain_consistently(store: &LocalStore) {
+        let events = {
+            let mut statement = store
+                .connection
+                .prepare(
+                    "SELECT sequence, event_id, timestamp, session_id, category, action,
+                            decision, correlation_id, payload_json, previous_hash, chain_hash
+                     FROM events ORDER BY sequence",
+                )
+                .expect("prepare");
+            let rows = statement
+                .query_map([], event_from_row)
+                .expect("query")
+                .collect::<std::result::Result<Vec<_>, _>>()
+                .expect("collect");
+            rows
+        };
+
+        let mut previous: Option<String> = None;
+        for event in events {
+            let event = event.expect("decode event");
+            let linked = LocalEvent {
+                previous_hash: previous.clone(),
+                ..event
+            };
+            let link = linked.link_hash().expect("link");
             store
                 .connection
                 .execute(
                     "UPDATE events SET previous_hash = ?1, chain_hash = ?2 WHERE sequence = ?3",
-                    rusqlite::params![previous, link, raw.sequence],
+                    params![previous, link, linked.sequence],
                 )
                 .expect("relink");
             previous = Some(link);
