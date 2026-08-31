@@ -1,30 +1,30 @@
 <div align="center">
 
-<br/>
-
-# ◈ &nbsp;V I G I L
-
-### Runtime security for autonomous AI agents
-
-**An agent asks. VIGIL decides. Only then does anything reach the world.**
+<img src="assets/vigil-hero.svg" alt="VIGIL — local runtime security for autonomous AI agents" width="100%"/>
 
 <br/>
 
 [![Rust](https://img.shields.io/badge/Rust-1.82%2B-CE422B?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![Swift](https://img.shields.io/badge/Swift-6.3-F05138?style=for-the-badge&logo=swift&logoColor=white)](https://swift.org/)
-[![Tests](https://img.shields.io/badge/tests-842_passing-2ea44f?style=for-the-badge)](#evidence)
+[![Tests](https://img.shields.io/badge/tests-870_passing-2ea44f?style=for-the-badge)](#evidence)
 [![unsafe](https://img.shields.io/badge/unsafe-forbidden-2ea44f?style=for-the-badge)](#evidence)
 [![License](https://img.shields.io/badge/license-Apache_2.0-1e3a8a?style=for-the-badge)](LICENSE)
 
 <br/>
 
+**An agent asks. VIGIL decides. Only then does anything reach the world.**
+
+[Why VIGIL](#the-problem-in-one-paragraph) · [Architecture](#architecture) · [Evidence](#evidence) · [Run it](#run-it) · [Security](SECURITY.md)
+
+<br/>
+
 <table>
 <tr>
-<td align="center"><b>733</b><br/><sub>Rust tests</sub></td>
-<td align="center"><b>80</b><br/><sub>Swift tests</sub></td>
+<td align="center"><b>734</b><br/><sub>Rust tests</sub></td>
+<td align="center"><b>107</b><br/><sub>Swift tests</sub></td>
 <td align="center"><b>25</b><br/><sub>attack scenarios</sub></td>
 <td align="center"><b>12</b><br/><sub>fuzz targets</sub></td>
-<td align="center"><b>42</b><br/><sub>decision records</sub></td>
+<td align="center"><b>45</b><br/><sub>decision records</sub></td>
 <td align="center"><b>0</b><br/><sub>lines of unsafe</sub></td>
 </tr>
 </table>
@@ -198,14 +198,17 @@ instead of inheriting one. See [ADR 0017](docs/adr/0017-approvals-mint-bounded-c
 [ADR 0018](docs/adr/0018-risk-is-monotone-and-only-subtracts-authority.md), and the
 [fail-closed matrix](docs/security/FAIL_CLOSED_MATRIX.md).
 
-Denials that name a detection produce one, from a fixed catalogue of twelve rules carrying a
+Denials that name a detection produce one, from a fixed catalogue of 36 rules carrying a
 severity and a *separate* confidence, plus the Agentic Runtime Security Tactic they belong to.
 Rules are constants, not a scripting surface. A critical detection — or a session reaching a
 containing risk state — opens an incident; responses are named, idempotent, and recorded even
 when they changed nothing. The event log is hash-chained over canonical bytes, so editing a
 record, deleting one, or reordering two all fail `vigil audit verify-local` with a non-zero exit.
-That is tamper-*evident*, not immutable: anything that can write the database can rewrite the
-whole chain. See [ADR 0019](docs/adr/0019-local-detections-incidents-and-a-tamper-evident-event-chain.md).
+The hash chain alone cannot expose a wholesale rewrite, so manual Ed25519 checkpoints bind a
+sequence and head hash to a key outside the database. An attacker who can also obtain that signing
+key can still rewrite and re-sign history; this is tamper evidence, not immutability. See
+[ADR 0019](docs/adr/0019-local-detections-incidents-and-a-tamper-evident-event-chain.md) and
+[ADR 0040](docs/adr/0040-signed-checkpoints-close-the-rewrite-hole.md).
 
 MCP is treated as a first-class attack surface. A tool name is a string the server chooses, so
 mapping names to capabilities would fail against the threat it is meant to cover; instead every
@@ -338,9 +341,11 @@ The Phase 4 foundation now has the corresponding network boundary. `vigil-networ
 instance-bound destination snapshots, and a public `NEFilterDataProvider` subclass verifies and
 installs them before projecting audit-token-attributed flows into a no-I/O callback state. Exact
 hostname, protocol, port, pinned public address, resolution lease, whole-policy lease, and flow/
-destination budgets are enforced consistently by Rust and Swift checks. The protected policy
-publisher and activatable System Extension are not built, so this does not intercept direct
-sockets yet. See [ADR 0035](docs/adr/0035-network-flow-authority-is-hostname-plus-pinned-address.md),
+destination budgets are enforced consistently by Rust and Swift checks. The protected publisher,
+read-only provider startup lifecycle, and matching containing-app configuration factory are built,
+and the unsigned containing app embeds the provider as a real System Extension product. It is not
+provisioned, signed, or activatable, so this does not intercept direct sockets yet.
+See [ADR 0035](docs/adr/0035-network-flow-authority-is-hostname-plus-pinned-address.md),
 [ADR 0036](docs/adr/0036-macos-network-policy-arrives-out-of-band.md), and the
 [Network Extension model](docs/architecture/NETWORK_EXTENSION_MODEL.md).
 
@@ -595,37 +600,37 @@ labelled as available.
 | Structured process broker | **BETA** | exact-path allowlist only; kills direct child only |
 | Approvals and capability leases | **BETA** | not an OS-level boundary — see ADR 0017 |
 | Risk engine and degradation | **BETA** | 12 dimensions, monotone |
-| Detections, incidents, responses | **BETA** | 36 rules; no process termination |
+| Detections, incidents, responses | **BETA** | 36 rules; opt-in identity-checked tree termination |
 | Sequence, threshold, graph detections | **EXPERIMENTAL** | retrospective; explains, does not block |
 | Release security gates | **STABLE** | §89 conditions as tests, in CI |
-| Tamper-evident event chain | **BETA** | evident, not immutable; no signed checkpoints |
+| Tamper-evident event chain | **BETA** | signed checkpoints detect rewrites; key custody remains external |
 | Rollback of managed writes and deletes | **BETA** | broker-mediated operations only |
 | Git broker | **BETA** | config neutralized; Git itself unsandboxed |
 | MCP authorization, identity, drift | **BETA** | argument-level authorization, binary identity |
 | MCP stdio proxy | **EXPERIMENTAL** | in the path for traffic routed through it; direct contact unmediated |
 | Network probe broker | **EXPERIMENTAL** | payload-free probe, not a firewall |
-| Network flow fast path and native adapter | **EXPERIMENTAL** | signed pinned-destination policy; provider compiles, not installed |
+| Network flow fast path and native adapter | **EXPERIMENTAL** | unsigned containing-app/SYSX graph builds; not signed or installed |
 | Deception canaries | **EXPERIMENTAL** | workspace-scoped only |
 | Intent–execution reconciliation | **EXPERIMENTAL** | engine works; nothing feeds it |
-| Secret broker | **EXPERIMENTAL** | interface and simulator; no Keychain provider |
+| Secret broker | **EXPERIMENTAL** | Keychain-backed git use; HTTP/signing purposes fail closed |
 | Endpoint Security fast path and adapter | **EXPERIMENTAL** | compiles; not installed, signed, or entitled |
 | Endpoint System Extension (installable) | **PLANNED** | blocked on Apple entitlement |
-| Network System Extension (installable) | **PLANNED** | data provider compiles; protected distribution/entitlement path required |
+| Network System Extension product | **EXPERIMENTAL** | reviewable unsigned target embeds correctly; provisioning, signing, and activation required |
 | `vigild` daemon and authenticated IPC | **PLANNED** | protocol compiles; no registered service |
-| SwiftUI Control Center | **PLANNED** | requires full Xcode |
-| Signed audit checkpoints | **PLANNED** | requires a signing identity |
-| Process-tree termination | **PLANNED** | requires OS-verified process identity |
+| SwiftUI Control Center | **EXPERIMENTAL** | minimal readiness shell builds; operational UI remains |
+| Signed audit checkpoints | **EXPERIMENTAL** | manual CLI checkpoints; off-host key custody/scheduling remain |
+| Process-tree termination | **EXPERIMENTAL** | opt-in; PID/start-time/executable rechecked before signals |
 | Shell broker | **NOT PLANNED** | deliberately excluded; see ADR 0007 |
 
 ## Evidence
 
 | | |
 |---|---|
-| **Tests passing** | **842** — 733 Rust, 80 Swift, 29 Python |
+| **Tests passing** | **870** — 734 Rust, 107 Swift, 29 Python |
 | **Tests asserting something is *impossible*** | **154** — replay, forgery, mutation, escalation, cross-tenant, impersonation |
 | **Property tests** | algebraic laws over generated inputs, not just examples |
 | **Local decision latency** | 18 µs permitted, 273 µs when a detection fires (Apple M2) |
-| **Rust** | 55,353 lines across 15 crates · **Swift** 5,648 lines across 2 adapters |
+| **Rust** | 55,373 lines across 15 crates · **Swift** 8,607 lines across 2 adapters + macOS app |
 | **Python SDK** | 1,364 lines, **zero runtime dependencies** |
 | **Static analysis** | `clippy -D warnings` clean · `#![forbid(unsafe_code)]` in every crate |
 | **Policy** | 30 rules across 6 shipped bundles, tested against the *real* bundles not fixtures |
@@ -684,9 +689,10 @@ email. Both the engine and the policy were wrong; both were fixed.
 git clone https://github.com/bbrookhart/VIGIL && cd VIGIL
 
 make demo          # blocked-injection + safe-action demonstrations
-make test          # 762 tests, Rust + Python
+make test          # 763 tests, Rust + Python; native XCTest is in make verify-macos
 make verify        # fmt + clippy -D warnings + full suite  (what CI would run)
 make verify-macos  # portable gates + native Endpoint Security and Network adapter checks
+make build-macos-app # unsigned containing app + embedded Network System Extension
 ```
 
 No Docker, no services, no network. `make demo` wires Core and Gateway in-process against the
@@ -733,8 +739,12 @@ durable in SQLite. The local secret component now reads real macOS Keychain item
 authenticate to a git remote without the credential reaching the agent; HTTP authentication and
 artifact signing are not implemented and fail rather than claiming a use. The macOS Endpoint Security fast path and API adapter are built, but System
 Extension packaging, activation, signing, and entitled-device enforcement are not. Network
-Extension, `vigild`, XPC Mach-service registration, and the native Control Center are not yet
-implemented. The Endpoint adapter does contain the bounded listener lifecycle, peer verifier,
+Extension signing/activation, `vigild`, XPC Mach-service registration, and the operational native
+Control Center are not yet implemented. The Network data provider, signed policy verifier, atomic
+publisher, durable replay floor, read-only startup lifecycle, containing-app configuration
+factory, and bounded preference controller compile and are XCTest-covered. A minimal SwiftUI
+containing app now embeds their unsigned System Extension product at the standard bundle path,
+but the App Group is not provisioned and the product is not signed or activatable. The Endpoint adapter contains the bounded listener lifecycle, peer verifier,
 message bridge, and atomic control service they will use. Its anonymous integration check exercises
 a real XPC request, but it is not a signed daemon/System Extension deployment.
 Installed Endpoint policy is also a runtime lease: health becomes unready at its exclusive expiry,
@@ -772,7 +782,7 @@ are in [`docs/operations/benchmarks.md`](docs/operations/benchmarks.md).
 - **Measured, not claimed** — latency and detection quality are benchmarked with documented method
 - **Cross-language contract testing** — two implementations pinned to one spec-derived vector file
 - **Documented failure modes** — every dependency has a written answer to "what if it's down?", resolved against impact tier
-- **Architecture decision records** — [36 ADRs](docs/adr/) with alternatives considered and rejected
+- **Architecture decision records** — [45 ADRs](docs/adr/) with alternatives considered and rejected
 - **Intellectual honesty** — the weakest control is labelled as such *in its own source file*
 
 Every security module carries a `Why / What / Assumptions / Failure mode / Evidence` header.

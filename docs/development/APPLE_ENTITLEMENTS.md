@@ -20,8 +20,12 @@ bundle and application-group identifiers. These strings are not capabilities and
 only through the signed Xcode configuration/provisioning path.
 
 The SDK marks `NEFilterControlProvider` and its rule-request APIs unavailable on macOS. Network
-policy therefore arrives through a future protected out-of-band shared-container/configuration
-publisher, as recorded in ADR 0036; the data-provider callback never waits for daemon IPC.
+policy therefore arrives through the implemented protected out-of-band shared-container
+publisher, as recorded in ADRs 0036 and 0043; the data-provider callback never waits for daemon
+IPC. The containing-app configuration factory and provider startup parser share one strict
+`vigil.network-provider/v1` contract carrying the provisioned App Group, installation instance,
+and trusted public keys. The provider's group access is read-only and startup refuses a missing,
+unstable, or mismatched envelope/replay-record pair.
 
 The SDK also exposes public `SecCodeCreateWithXPCMessage`, which derives a dynamic code object from
 the audit token attached to an XPC message, and `SecCodeCheckValidity`, which evaluates the daemon's
@@ -35,10 +39,11 @@ Endpoint Security and Network Extension capability approval/provisioning are ext
 dependencies. CI uses simulated sources and entitlement-free native compile/parity checks; it
 must never fake entitlement success or extension activation.
 
-This machine has Command Line Tools rather than full Xcode. The native adapter can compile, but a
-real System Extension bundle, containing app, activation request, generated provisioning profile,
-code-signing validation, and XCTest target cannot be created or tested here. Those artifacts must
-come from the matching full-Xcode templates and be reviewed rather than guessed.
+This machine now has Xcode 26.6 and can build and test the native Swift packages. The repository's
+reviewable Xcode project also builds an unsigned SwiftUI containing app with the Network System
+Extension embedded at `Contents/Library/SystemExtensions`. It has no valid code-signing identity,
+approved security entitlement, or provisioning profile. Activation, signing, and entitled
+behavior therefore cannot be tested here yet.
 
 `APPLE_APPLICATION_PACK.md` holds the enrolment decision and drafted request
 justifications; `UNBLOCKING.md` records the dependency order for obtaining these, and the disposable-VM

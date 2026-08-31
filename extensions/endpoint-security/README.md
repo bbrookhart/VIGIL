@@ -53,11 +53,11 @@ new root attribution deny at the exclusive expiry boundary or on clock failure, 
 becomes unready while preserving the installed generation for diagnosis. Unmanaged processes
 continue to allow so stale control state cannot deny the entire host.
 
-The installed development environment used for this phase has Command Line Tools, macOS SDK 26.5,
-and Swift 6.3.3, but not full Xcode. Consequently this directory is a buildable Swift package and
-contains reviewed entitlement/identifier configuration, but it is not an activatable System
-Extension bundle or containing application target. Those must be created and verified from the
-matching full-Xcode System Extension template rather than inventing bundle metadata.
+The installed development environment now has Xcode 26.6, macOS SDK 26.5, and Swift 6.3.3.
+This directory remains a buildable Swift package with reviewed entitlement/identifier
+configuration, not an activatable System Extension bundle or containing application target. Those
+targets must be created and verified from the matching public-Xcode System Extension template
+rather than inventing bundle metadata.
 
 Apple approval for `com.apple.developer.endpoint-security.client`, Full Disk Access, signing,
 notarization, containing-app activation, and privileged-device testing remain external release

@@ -813,12 +813,13 @@ fn attack_redirecting_containment_onto_an_innocent_process() {
     );
 
     // The point of the scenario: the bystander is still running.
-    let alive = Command::new("/bin/ps")
-        .args(["-p", &innocent_pid.to_string()])
-        .output()
-        .expect("ps")
-        .status
-        .success();
+    // Poll the child handle directly. The test itself must not require permission to inspect
+    // the process table: inability to run `ps` is one of the uncertainty paths that production
+    // containment must turn into a refusal rather than a signal.
+    let alive = innocent
+        .try_wait()
+        .expect("poll bystander process")
+        .is_none();
     let _ = innocent.kill();
     let _ = innocent.wait();
     assert!(

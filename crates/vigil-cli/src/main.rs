@@ -1032,7 +1032,7 @@ fn start_semantic_session(
             "profile": profile.as_str(),
             "workspace": workspace,
             "semantic_brokers": ["filesystem", "process", "network_probe"],
-            "secret_broker": "interface_and_simulator_only",
+            "secret_broker": "keychain_metadata_and_git_auth_available",
             "os_enforcement": false,
         }),
     )?;
@@ -2935,7 +2935,7 @@ fn local_status(state_db: Option<&Path>, json: bool) -> vigil_common::Result<()>
         println!("Filesystem broker    AVAILABLE (semantic enforcement)");
         println!("Process broker       AVAILABLE (structured semantic enforcement)");
         println!("Network probe broker AVAILABLE (payload-free semantic mediation)");
-        println!("Secret broker        INTERFACE + SIMULATOR ONLY (no native provider)");
+        println!("Secret broker        KEYCHAIN METADATA + GIT AUTH (other purposes unavailable)");
         println!("Endpoint fast path   SIMULATOR AVAILABLE (native adapter not installed)");
         println!("Blast-radius budget  ACTIVE");
         println!(

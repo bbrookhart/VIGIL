@@ -60,6 +60,10 @@ Two rules govern every row:
 | Network policy snapshot is malformed or rolls generation backward | Installation is rejected atomically and the last valid generation remains active. | Unaffected |
 | Network policy signature/key/instance is invalid | Authentication fails before payload decoding; no state is installed. | Unaffected |
 | Whole network policy lease expires or its clock is unavailable | Managed flows are denied with forced enforce semantics, even if the last mode was `OFF` or `OBSERVE`. | Unaffected |
+| Network policy transport is missing, symlinked, oversized, insecure, or corrupt | Reload fails and activates no new state; the callback never reads the transport directly. | Unaffected |
+| Network generation persistence fails or the same generation names different envelope bytes | Installation stops before activation. A restart may restore only the exact envelope committed at the durable replay floor. | Unaffected |
+| Network filter preferences fail to load/save/remove or do not round-trip exactly | The containing app reports failure or configuration drift; it never claims the filter is enabled. | Unaffected |
+| Network filter preference operation times out | The outcome is reported unknown and that controller instance refuses every subsequent operation, preventing a blind mutation retry. | Unaffected |
 | System clock moves backwards | Expiry uses `max(wall, high water)`, so expired leases and approvals stay expired. A material regression fires `VIGIL-L032`. | Unaffected |
 | System clock moves far forward | Leases and approvals expire early. Fails safe, and is not detected — see ADR 0030. | Unaffected |
 | Clock state row is unreadable | The reading falls back to the wall clock for that call; monotonicity is lost until it is readable again. | Unaffected |

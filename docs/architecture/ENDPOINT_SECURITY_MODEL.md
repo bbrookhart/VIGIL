@@ -4,7 +4,7 @@
 
 ## Verified Apple surface
 
-Development on 2026-08-30 used Apple Silicon macOS 26.6.2, Command Line Tools macOS SDK 26.5,
+Development on 2026-08-30 used Apple Silicon macOS 26.6.2, Xcode 26.6 with macOS SDK 26.5,
 and Swift 6.3.3. The installed public headers and Swift module verify:
 
 - `es_new_client` and `es_subscribe`;

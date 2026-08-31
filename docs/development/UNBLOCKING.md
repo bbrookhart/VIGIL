@@ -6,7 +6,7 @@ because the slowest one does not block the most valuable one.
 
 ```
 Full Xcode ─────────────────────────────────► Phase 5, XCTest, bundle targets
-  free, immediate
+  installed: Xcode 26.6
 
 Developer Program ($99/yr) ─┬───────────────► signing, notarization  (Phase 9)
   same day as an individual; └── prerequisite ─► both entitlement requests
@@ -21,10 +21,10 @@ Disposable VM ──────────────────────
   free, needs neither of the above
 ```
 
-## 0. Prerequisites on this machine
+## 0. Xcode prerequisite — completed on this machine
 
-Xcode is a ~10 GB download that expands to 25–40 GB. Budget **50 GB free**; a machine at 92% full
-will fail partway through and leave a broken install. Check with `diskutil info /System/Volumes/Data`.
+Xcode 26.6 is installed and selected. The commands below remain the reproducible setup path for a
+new development machine; they are no longer a blocker on this one.
 
 Install from the App Store, or:
 
@@ -139,7 +139,8 @@ not a test to relax.
 
 1. **Today** — decide Individual vs Organization and enrol (`APPLE_APPLICATION_PACK.md` §2). If
    Organization, request the D-U-N-S number first: longest lead time, costs nothing.
-2. **Today** — free ~50 GB and install Xcode. Then bundle targets, XCTest, Phase 5.
+2. **Completed** — Xcode 26.6 is installed. Bundle targets are now engineering work; activation
+   still waits on signing and entitlements.
 3. **This week** — disposable VM, run the table in §4, record each result against its ADR.
 4. **On membership** — submit both entitlement requests, citing the §4 results.
 5. **On approval** — signing, notarization, entitled-device re-run on a SIP-intact machine, and the

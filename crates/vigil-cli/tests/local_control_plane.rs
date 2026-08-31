@@ -12,7 +12,7 @@ fn fixture() -> (PathBuf, PathBuf, PathBuf) {
 }
 
 #[test]
-fn status_reports_secret_interface_without_claiming_native_custody() {
+fn status_reports_keychain_git_use_without_claiming_os_enforcement() {
     let (root, _workspace, database) = fixture();
     let output = Command::new(env!("CARGO_BIN_EXE_vigil"))
         .args([
@@ -29,6 +29,25 @@ fn status_reports_secret_interface_without_claiming_native_custody() {
     assert_eq!(status["endpoint_fast_path"], "SIMULATOR_AVAILABLE");
     assert_eq!(status["endpoint_security"], "NOT INSTALLED");
     assert_eq!(status["os_enforcement"], false);
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
+fn human_status_and_json_agree_that_the_keychain_provider_exists() {
+    let (root, _workspace, database) = fixture();
+    let output = Command::new(env!("CARGO_BIN_EXE_vigil"))
+        .args([
+            "--state-db",
+            database.to_str().expect("database path"),
+            "status",
+        ])
+        .output()
+        .expect("read human status");
+    assert!(output.status.success());
+    let status = String::from_utf8(output.stdout).expect("status text");
+    assert!(status.contains("KEYCHAIN METADATA + GIT AUTH"));
+    assert!(!status.contains("SIMULATOR ONLY"));
+    assert!(status.contains("Endpoint Security    NOT INSTALLED"));
     let _ = std::fs::remove_dir_all(root);
 }
 

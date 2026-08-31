@@ -1,7 +1,8 @@
 # Secret broker model
 
-The Phase 2 secret surface is an interface and simulator, not a native Keychain integration.
-Its central invariant is that successful broker calls return a receipt, never credential bytes.
+The Phase 2 secret surface includes a simulator and a macOS Keychain-backed provider for Git
+authentication. Its central invariant is that successful broker calls return a receipt, never
+credential bytes.
 
 ## Authority
 
@@ -47,12 +48,11 @@ direction and the broker reports failure.
 
 - `SimulatedSecretProvider` models metadata, success, failure, and invocation counts for CI, but
   deliberately contains no real secret material.
-- No Keychain provider, native signing helper, authenticated Git/HTTP adapter, or CLI use command
-  exists yet.
+- Keychain-backed Git authentication is implemented without placing the credential in argv or
+  VIGIL storage. HTTP authentication and artifact signing are not implemented and fail closed.
 - Session IDs remain lookup keys rather than authenticated bearer credentials.
 - Direct process access to environment variables, files, Keychain, or other credential sources
-  remains bypassable until Endpoint Security, authenticated daemon IPC, and native providers
-  exist.
+  remains bypassable until Endpoint Security and authenticated daemon IPC exist.
 
-The CLI reports `INTERFACE + SIMULATOR ONLY`; it never presents this phase as deployed secret
-custody.
+The CLI reports `KEYCHAIN_METADATA_AND_GIT_AUTH`; it separately reports that OS enforcement and
+`vigild` are not installed, so the provider is never presented as an agent-proof custody boundary.
