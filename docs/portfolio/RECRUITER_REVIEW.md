@@ -30,6 +30,9 @@ finding-and-repair loop is stronger evidence than a static test-count claim. A l
 fuzz case exposed a harness mismatch: an unstable exponent-form number round-tripped lossily, but
 the real baseline path already refused it during canonical hashing. The harness now mirrors that
 acceptance boundary, and an actual-store regression proves the rejected schema is never recorded.
+A later path campaign found a genuine separator mismatch: detection folded Windows backslashes
+before normalization while the shared containment helper did not. The common normalizer now treats
+both separator spellings structurally, so suspicion and permission cannot disagree on that form.
 
 **Residual risk:** same-user approval/storage and missing signed-entitled device evidence remain the
 dominant trust-boundary gaps. A full-history secret scan and independent review are still required

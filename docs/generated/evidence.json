@@ -6,7 +6,7 @@
   "named_attack_paths": 21,
   "python_test_functions": 11,
   "release_security_gates": 11,
-  "rust_test_entry_points": 736,
+  "rust_test_entry_points": 737,
   "swift_test_entry_points": 199,
   "unsafe_code_constructs": 0,
   "workspace_crates": 15

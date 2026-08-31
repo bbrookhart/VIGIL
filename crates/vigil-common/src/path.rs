@@ -24,9 +24,13 @@
 /// A leading `..` in a relative path is *retained* rather than dropped, so an escape stays
 /// visible to the caller instead of silently normalizing away.
 pub fn normalize(path: &str) -> String {
-    let absolute = path.starts_with('/');
+    // Treat both separator spellings as structural. On Unix a backslash can be a literal
+    // filename character, but accepting it here while the detector folds it to `/` makes the
+    // permission and suspicion paths disagree. The conservative interpretation can only deny
+    // an unusual Unix filename; it also closes the Windows-style traversal spelling.
+    let absolute = path.starts_with('/') || path.starts_with('\\');
     let mut stack: Vec<&str> = Vec::new();
-    for component in path.split('/') {
+    for component in path.split(|character| character == '/' || character == '\\') {
         match component {
             "" | "." => {}
             ".." => {
@@ -91,6 +95,15 @@ mod tests {
         assert!(!is_inside_any("/workspace-evil/a.txt", &roots));
         assert!(!is_inside_any("/etc/passwd", &roots));
         assert!(!is_inside_any("/workspace/../etc/passwd", &roots));
+        assert!(!is_inside_any(r"/workspace/x\..\../etc/passwd", &roots));
+    }
+
+    #[test]
+    fn backslash_and_forward_slash_spellings_normalize_identically() {
+        assert_eq!(
+            normalize(r"\workspace\notes\..\secret.txt"),
+            normalize("/workspace/notes/../secret.txt")
+        );
     }
 
     #[test]
