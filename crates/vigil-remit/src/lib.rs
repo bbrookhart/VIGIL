@@ -151,10 +151,10 @@ impl CompiledRemit {
             vigil_protocol::action::Action::Network(n) => {
                 return self.evaluate_destination(n);
             }
-            vigil_protocol::action::Action::Delegation(d) => {
-                if d.depth >= self.remit.limits.max_delegation_depth {
-                    return RemitVerdict::OutOfRemit(ReasonCode::DelegationDepthExceeded);
-                }
+            vigil_protocol::action::Action::Delegation(d)
+                if d.depth >= self.remit.limits.max_delegation_depth =>
+            {
+                return RemitVerdict::OutOfRemit(ReasonCode::DelegationDepthExceeded);
             }
             _ => {}
         }
