@@ -11,7 +11,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [vigil_v2]
   pull_request:
   schedule:
     # Advisories appear between commits, so the dependency audit also runs on a timer.
