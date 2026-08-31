@@ -302,12 +302,10 @@ impl SecretProvider for KeychainSecretProvider {
 /// The shape is exact: `"name"<type>=value`, optionally indented. Anything else is not an
 /// attribute declaration and is skipped.
 ///
-/// Found by fuzzing: a looser parse — split on the first `=`, then take whatever sits between
-/// the first pair of quotes on each side — accepted lines like `"\x15="` and produced an
-/// attribute out of them. Real `security` output never looks like that, and no forgery of the
-/// kind attribute was reachable through it, because every genuine line's key supplies the
-/// first `=`. But a parser that answers confidently about input it does not understand is the
-/// wrong shape for the thing that decides what a credential may be used for.
+/// Fuzzing has found two fail-open shapes here: a loose split around `=` accepted malformed
+/// declarations, and an arbitrary prefix plus an unterminated quote could turn an unset line
+/// into a present kind. Neither shape matches `security` output, but a parser that answers
+/// confidently about input it does not understand is wrong for a credential-use decision.
 fn parse_attribute_line(line: &str) -> Option<(String, String)> {
     let rest = line.trim_start().strip_prefix('"')?;
     let (name, rest) = rest.split_once('"')?;
@@ -321,9 +319,21 @@ fn parse_attribute_line(line: &str) -> Option<(String, String)> {
     if value == "<NULL>" {
         return None;
     }
-    // Blob values are quoted, and may be preceded by a hex rendering of the same bytes.
-    // Take what is inside the first pair of quotes.
-    let unquoted = value.split('"').nth(1)?;
+    // Blob values are quoted, and may be preceded by a hex rendering of the same bytes. Be
+    // deliberately strict about both forms: accepting an arbitrary prefix or an unterminated
+    // quote lets a malformed unset value such as `<NULL>"api_token` become a present kind.
+    let (prefix, quoted) = value.split_once('"')?;
+    let prefix = prefix.trim();
+    if !prefix.is_empty() {
+        let hex = prefix.strip_prefix("0x")?;
+        if hex.is_empty() || !hex.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return None;
+        }
+    }
+    let (unquoted, suffix) = quoted.split_once('"')?;
+    if !suffix.trim().is_empty() || unquoted == "<NULL>" {
+        return None;
+    }
     Some((name.to_string(), unquoted.to_string()))
 }
 
@@ -415,6 +425,29 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     const SECRET: &str = "SUPERSECRET-do-not-disclose-42";
+
+    #[test]
+    fn malformed_or_unset_attribute_values_fail_closed() {
+        let valid = KeychainSecretProvider::attributes(
+            "\"icmt\"<blob>=\"api_token\"\n\"cdat\"<timedate>=0x4142 \"AB\"",
+        );
+        assert_eq!(valid.get("icmt").map(String::as_str), Some("api_token"));
+        assert_eq!(valid.get("cdat").map(String::as_str), Some("AB"));
+
+        for dump in [
+            "\"icmt\"<blob>=<NULL>",
+            "\"icmt\"<blob>=<NULL>\"api_token",
+            "\"icmt\"<blob>=junk\"api_token\"",
+            "\"icmt\"<blob>=\"api_token",
+            "\"icmt\"<blob>=\"api_token\" trailing",
+            "\"icmt\"<blob>=\"<NULL>\"",
+        ] {
+            assert!(
+                !KeychainSecretProvider::attributes(dump).contains_key("icmt"),
+                "malformed or unset attribute was accepted: {dump:?}"
+            );
+        }
+    }
 
     /// A throwaway keychain, so tests never touch the user's login keychain and never prompt.
     #[cfg(target_os = "macos")]

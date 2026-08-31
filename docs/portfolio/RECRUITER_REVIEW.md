@@ -24,6 +24,9 @@ The invariant register maps rationale, mechanism, tests, boundary, bypass and ha
 canonical status page refuses to equate broker mediation, simulation, native compile tests and
 activated enforcement. Static “passing” counts are gone; source declarations are generated and CI
 is the execution record. Code fixes strengthen executable identity and SDK transport validation.
+A fresh candidate fuzz run then found that malformed trailing bytes could turn an unset Keychain
+attribute into a present kind; the parser now fails closed and the reproducer is committed. That
+finding-and-repair loop is stronger evidence than a static test-count claim.
 
 **Residual risk:** same-user approval/storage and missing signed-entitled device evidence remain the
 dominant trust-boundary gaps. A full-history secret scan and independent review are still required

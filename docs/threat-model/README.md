@@ -79,7 +79,7 @@ it is exposed.
 | Tamper with the audit log | Hash chain + signed checkpoints; independent verifier | ✅ tested |
 | Rewrite history and re-link the chain | Checkpoint signature pins the pre-existing chain state | ✅ tested |
 | Truncate the audit log | Checkpoint covering a missing sequence reports truncation | ✅ tested |
-| Crash Core with hostile input | Bounded scans, bounded tokens, cycle-safe graph walks | ✅ partial — 10 parsers fuzzed; no chaos testing |
+| Crash Core with hostile input | Bounded scans, bounded tokens, cycle-safe graph walks | ✅ partial — 12 parsers fuzzed; no chaos testing |
 | Forge log lines via identifiers or errors | Narrow id charset; single-line excerpting | ✅ tested |
 | Starve the decision path | Linear-time matchers, no regex backtracking in policy | ✅ tested |
 | **Bypass by not calling VIGIL at all** | NetworkPolicy: agent egress denied except to the Gateway | ✅ [tested](../../tests/e2e/k8s_bypass.sh) |

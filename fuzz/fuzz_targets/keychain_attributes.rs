@@ -22,6 +22,32 @@ fuzz_target!(|data: &[u8]| {
 
     let attributes = KeychainSecretProvider::attributes(text);
 
+    // An unset value must remain unset even when hostile trailing bytes look like a quoted
+    // kind. Check each line independently so a separate legitimate declaration of the same
+    // attribute cannot hide a fail-open parse.
+    for line in text.lines() {
+        let line = line.trim_start();
+        let Some(rest) = line.strip_prefix('"') else {
+            continue;
+        };
+        let Some((name, rest)) = rest.split_once('"') else {
+            continue;
+        };
+        let Some((_kind, rest)) = rest.strip_prefix('<').and_then(|rest| rest.split_once('>'))
+        else {
+            continue;
+        };
+        let Some(value) = rest.strip_prefix('=') else {
+            continue;
+        };
+        if value.trim_start().starts_with("<NULL>") {
+            assert!(
+                !KeychainSecretProvider::attributes(line).contains_key(name),
+                "an unset attribute accepted trailing data as a value (line: {line:?})"
+            );
+        }
+    }
+
     for (name, value) in &attributes {
         // A name is one quoted token. One carrying a quote would mean the split walked past
         // its own field and read part of a neighbouring one.
