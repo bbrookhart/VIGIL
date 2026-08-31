@@ -79,7 +79,7 @@ it is exposed.
 | Tamper with the audit log | Hash chain + signed checkpoints; independent verifier | ✅ tested |
 | Rewrite history and re-link the chain | Checkpoint signature pins the pre-existing chain state | ✅ tested |
 | Truncate the audit log | Checkpoint covering a missing sequence reports truncation | ✅ tested |
-| Crash Core with hostile input | Bounded scans, bounded tokens, cycle-safe graph walks | ✅ partial — no fuzzing yet |
+| Crash Core with hostile input | Bounded scans, bounded tokens, cycle-safe graph walks | ✅ partial — 10 parsers fuzzed; no chaos testing |
 | Forge log lines via identifiers or errors | Narrow id charset; single-line excerpting | ✅ tested |
 | Starve the decision path | Linear-time matchers, no regex backtracking in policy | ✅ tested |
 | **Bypass by not calling VIGIL at all** | NetworkPolicy: agent egress denied except to the Gateway | ✅ [tested](../../tests/e2e/k8s_bypass.sh) |
@@ -123,8 +123,11 @@ Stated plainly, because a threat model that only lists solved problems is market
    replica. The Gateway binary and the Helm chart both refuse to start with more than one
    replica until a shared store exists, so this is a capacity limit rather than a live
    vulnerability.
-7. **No fuzzing, no chaos testing, no red-team corpus.** The adversarial tests are
-   hand-written and therefore only cover attacks that were thought of.
+7. **The adversarial corpus is hand-written.** `crates/vigil-cli/tests/adversarial.rs` now
+   *executes* sixteen of the §61 scenarios against disposable fixtures rather than describing
+   them, and it found a real defect on its first run — deleting the newest audit record left a
+   chain that verified cleanly (ADR 0027). But the scenarios are still ones someone thought of.
+   Fuzzing covers ten parsers; there is no chaos testing and no generated attack corpus.
 8. **Approval preview shows recipient addresses in clear.** Deliberate — an approver who
    cannot see the recipient is rubber-stamping a hash — but it means the console is a
    sensitive surface requiring its own access control, which does not exist yet.
