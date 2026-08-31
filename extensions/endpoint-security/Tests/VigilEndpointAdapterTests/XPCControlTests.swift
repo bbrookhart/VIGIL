@@ -51,7 +51,9 @@ final class XPCControlTests: XCTestCase {
 
         let message = xpc_dictionary_create_empty()
         request.withUnsafeBytes { bytes in
-            xpc_dictionary_set_data(message, "request", bytes.baseAddress, bytes.count)
+            if let baseAddress = bytes.baseAddress {
+                xpc_dictionary_set_data(message, "request", baseAddress, bytes.count)
+            }
         }
         let response = XPCResponseWaiter()
         xpc_connection_send_message_with_reply(

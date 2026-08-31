@@ -5,7 +5,7 @@
 # to limit what an attacker can do next is to ship nothing for them to use.
 
 # ---------------------------------------------------------------- build
-FROM rust:1.85-slim-bookworm AS build
+FROM rust:1.88-slim-bookworm AS build
 
 WORKDIR /src
 

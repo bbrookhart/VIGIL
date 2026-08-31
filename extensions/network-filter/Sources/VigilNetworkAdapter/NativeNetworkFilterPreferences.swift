@@ -132,7 +132,8 @@ private final class SystemNativeNetworkFilterPreferences: NativeNetworkFilterPre
     /// Use NetworkExtension's completion-handler surface explicitly. Its async overlay sends
     /// the non-Sendable manager across an isolation boundary under Swift 6 strict concurrency.
     private func bridge(_ operation: (@escaping (Error?) -> Void) -> Void) async throws {
-        try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation {
+            (continuation: CheckedContinuation<Void, any Error>) in
             operation { error in
                 if let error {
                     continuation.resume(throwing: error)
