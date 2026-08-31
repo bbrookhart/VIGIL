@@ -686,6 +686,147 @@ fn attack_deleting_an_inconvenient_audit_record() {
     );
 }
 
+/// §61 — rewriting the whole log, not merely editing one record.
+///
+/// The hash chain makes an edit evident because every later link breaks. It does not make a
+/// *rewrite* evident: anything that can write the database can recompute every link and reset
+/// the AUTOINCREMENT high-water mark so the truncation check agrees too. This scenario runs
+/// that attack and shows which check notices.
+#[test]
+fn attack_rewriting_the_audit_chain_rather_than_editing_it() {
+    let disposable = Disposable::new("chain-rewrite");
+    let vigil = Vigil::new(&disposable);
+    let workspace = disposable.workspace();
+    let session = vigil.session(&workspace, "developer-standard");
+
+    let keys = disposable.path("keys");
+    assert!(vigil
+        .run(&[
+            "keys",
+            "generate",
+            "--out",
+            keys.to_str().expect("keys path")
+        ])
+        .status
+        .success());
+    let seed = keys.join("audit.key");
+    let seed = seed.to_str().expect("seed path");
+    let public = String::from_utf8(vigil.run(&["keys", "public", seed]).stdout)
+        .expect("public key")
+        .trim()
+        .to_string();
+
+    std::fs::write(workspace.join("work.txt"), b"work").expect("seed file");
+    vigil.run(&["fs", "read", &session, "work.txt"]);
+    let target = format!(
+        "{}/.ssh/vigil-adversarial-synthetic-key",
+        std::env::var("HOME").expect("HOME")
+    );
+    vigil.run(&["fs", "read", &session, &target]);
+
+    assert!(
+        vigil
+            .run(&["audit", "checkpoint", "--seed", seed, "--key-id", "local"])
+            .status
+            .success(),
+        "the chain must be checkpointed before tampering"
+    );
+
+    // The attack: remove the denial and make the log internally consistent again.
+    let database = disposable.path("state/vigil.db");
+    let connection = rusqlite::Connection::open(&database).expect("open sqlite");
+    let removed = connection
+        .execute("DELETE FROM events WHERE decision = 'DENY'", [])
+        .expect("delete");
+    assert!(removed >= 1, "the fixture must contain a denial to remove");
+    let remaining: i64 = connection
+        .query_row("SELECT MAX(sequence) FROM events", [], |row| row.get(0))
+        .expect("max sequence");
+    connection
+        .execute(
+            "UPDATE sqlite_sequence SET seq = ?1 WHERE name = 'events'",
+            [remaining],
+        )
+        .expect("reset the high-water mark");
+    drop(connection);
+
+    // Checking the links against each other now finds nothing. This is the limitation, and it
+    // is asserted rather than described so that a later change which happens to close it
+    // fails here and forces the claim to be restated.
+    assert!(
+        vigil.run(&["audit", "verify-local"]).status.success(),
+        "the link-by-link check was expected to miss a consistent rewrite"
+    );
+
+    refused(
+        "an agent rewrote the whole audit chain to erase its denial",
+        &vigil.run(&["audit", "verify-local", "--key", &format!("local={public}")]),
+    );
+}
+
+/// §61 — turning containment into the weapon.
+///
+/// `vigil contain --terminate` signals processes. An attacker who can write the database can
+/// therefore try to aim it: point a process node at a PID it does not own and let VIGIL kill
+/// something it should not. The recorded identity is what refuses.
+#[test]
+fn attack_redirecting_containment_onto_an_innocent_process() {
+    let disposable = Disposable::new("terminate-redirect");
+    let vigil = Vigil::new(&disposable);
+    let workspace = disposable.workspace();
+    let session = vigil.session(&workspace, "developer-standard");
+
+    // A bystander: not VIGIL's, not the agent's, and not to be touched.
+    let mut innocent = Command::new("/bin/sleep")
+        .arg("120")
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .expect("spawn a bystander process");
+    let innocent_pid = innocent.id();
+
+    // The attack: claim that PID belongs to the session, with a plausible but wrong identity.
+    let database = disposable.path("state/vigil.db");
+    let connection = rusqlite::Connection::open(&database).expect("open sqlite");
+    connection
+        .execute(
+            "INSERT INTO processes
+               (node_id, session_id, parent_node_id, pid, started_at, executable, argv_json,
+                generation, status, os_started_at, os_executable)
+             VALUES ('prc_forged', ?1, NULL, ?2, '2026-01-01T00:00:00Z', '/bin/sleep',
+                     '[\"sleep\"]', 0, 'running', 'Mon Jan 01 00:00:01 2001', '/bin/sleep')",
+            rusqlite::params![session, innocent_pid],
+        )
+        .expect("forge a process node");
+    drop(connection);
+
+    let output = vigil.run(&["contain", &session, "--terminate"]);
+    let rendered = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        rendered.contains("recycled") || rendered.contains("NOT stopped"),
+        "containment did not report refusing the forged node:\n{rendered}"
+    );
+
+    // The point of the scenario: the bystander is still running.
+    let alive = Command::new("/bin/ps")
+        .args(["-p", &innocent_pid.to_string()])
+        .output()
+        .expect("ps")
+        .status
+        .success();
+    let _ = innocent.kill();
+    let _ = innocent.wait();
+    assert!(
+        alive,
+        "VIGIL was aimed at an unrelated process and killed it"
+    );
+}
+
 /// §61.30 — declaring one intent while performing another, caught by reconciliation.
 #[test]
 fn attack_declaring_a_benign_intent_while_doing_something_else() {
