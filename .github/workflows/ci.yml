@@ -206,7 +206,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: azure/setup-helm@fe7b79cd5ee1e45176fcad797de68ecaf3ca4f6c # v4.2.0
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
       - run: helm lint deploy/helm/vigil -f deploy/helm/vigil/ci/test-values.yaml
       - run: helm template vigil deploy/helm/vigil -f deploy/helm/vigil/ci/test-values.yaml > /tmp/rendered.yaml
       # The guards must fire: a chart that renders without a tenant or without naming agent
