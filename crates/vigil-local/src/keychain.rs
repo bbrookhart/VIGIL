@@ -131,24 +131,14 @@ impl KeychainSecretProvider {
     }
 
     /// Parse `security`'s attribute dump into the fields VIGIL cares about.
-    fn attributes(dump: &str) -> BTreeMap<String, String> {
+    ///
+    /// Public so it can be fuzzed. Item descriptions are set by whoever created the Keychain
+    /// entry, so this parses input a user — or something acting as them — controls.
+    pub fn attributes(dump: &str) -> BTreeMap<String, String> {
         let mut attributes = BTreeMap::new();
         for line in dump.lines() {
-            let line = line.trim();
-            // Lines look like: "icmt"<blob>="api_token"
-            let Some((key, value)) = line.split_once('=') else {
-                continue;
-            };
-            let Some(name) = key.split('"').nth(1) else {
-                continue;
-            };
-            let value = value.trim();
-            if value == "<NULL>" {
-                continue;
-            }
-            // Values are quoted for blobs; take what is between the first pair of quotes.
-            if let Some(unquoted) = value.split('"').nth(1) {
-                attributes.insert(name.to_string(), unquoted.to_string());
+            if let Some((name, value)) = parse_attribute_line(line) {
+                attributes.insert(name, value);
             }
         }
         attributes
@@ -305,6 +295,36 @@ impl SecretProvider for KeychainSecretProvider {
             }
         }
     }
+}
+
+/// Parse one attribute line, or reject it.
+///
+/// The shape is exact: `"name"<type>=value`, optionally indented. Anything else is not an
+/// attribute declaration and is skipped.
+///
+/// Found by fuzzing: a looser parse — split on the first `=`, then take whatever sits between
+/// the first pair of quotes on each side — accepted lines like `"\x15="` and produced an
+/// attribute out of them. Real `security` output never looks like that, and no forgery of the
+/// kind attribute was reachable through it, because every genuine line's key supplies the
+/// first `=`. But a parser that answers confidently about input it does not understand is the
+/// wrong shape for the thing that decides what a credential may be used for.
+fn parse_attribute_line(line: &str) -> Option<(String, String)> {
+    let rest = line.trim_start().strip_prefix('"')?;
+    let (name, rest) = rest.split_once('"')?;
+    if name.is_empty() {
+        return None;
+    }
+    // The type marker sits between the name and the `=`, e.g. `<blob>`.
+    let (_type, rest) = rest.strip_prefix('<')?.split_once('>')?;
+    let value = rest.strip_prefix('=')?.trim();
+    // `<NULL>` means unset. Recording it would let an absent kind read as a present one.
+    if value == "<NULL>" {
+        return None;
+    }
+    // Blob values are quoted, and may be preceded by a hex rendering of the same bytes.
+    // Take what is inside the first pair of quotes.
+    let unquoted = value.split('"').nth(1)?;
+    Some((name.to_string(), unquoted.to_string()))
 }
 
 struct BoundedOutput {
@@ -615,6 +635,63 @@ mod tests {
             "the helper script embedded the secret"
         );
         assert!(script.contains("find-generic-password"));
+    }
+
+    #[test]
+    fn a_crafted_description_cannot_forge_the_secret_kind() {
+        // The kind is read out of an attribute dump that also carries fields whoever created
+        // the item controls. A description containing a newline and a fake `icmt` line would
+        // let an item claim a kind it does not have, and so claim purposes it should not
+        // serve.
+        //
+        // `security` escapes newlines as \012 and keeps a value on one line, which is what
+        // makes the line-oriented parse safe. That is a dependency on another tool's output
+        // format, so it is asserted here rather than assumed.
+        let keychain = TestKeychain::new();
+        let injection = "benign\"\n    \"icmt\"<blob>=\"signing_key\"";
+        let status = Command::new(SECURITY_PATH)
+            .args([
+                "add-generic-password",
+                "-a",
+                "vigil-test",
+                "-s",
+                "sec_injected",
+                "-w",
+            ])
+            .arg(SECRET)
+            .arg("-j")
+            .arg("api_token")
+            .arg("-D")
+            .arg(injection)
+            .arg(&keychain.path)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .expect("add");
+        assert!(status.success());
+
+        let metadata = keychain
+            .provider()
+            .metadata("sec_injected")
+            .expect("metadata");
+        assert_eq!(
+            metadata.kind,
+            SecretKind::ApiToken,
+            "a crafted description overrode the declared kind"
+        );
+        assert!(!metadata
+            .supported_purposes
+            .contains(&SecretUsePurpose::ArtifactSigning));
+
+        // And the escaping itself: the raw dump must not contain a bare newline inside a value.
+        let mut command = keychain.provider().find_command("sec_injected", false);
+        let output = run_bounded(&mut command, 10_000, "test").expect("run");
+        let forged = output
+            .stdout
+            .lines()
+            .filter(|line| line.trim_start().starts_with("\"icmt\""))
+            .count();
+        assert_eq!(forged, 1, "the description produced a second icmt line");
     }
 
     #[test]
