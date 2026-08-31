@@ -205,6 +205,9 @@ enum Command {
     /// Signing key material.
     #[command(subcommand)]
     Keys(KeysCommand),
+    /// Inspect secrets held in the macOS Keychain, without disclosing them.
+    #[command(subcommand)]
+    Secrets(SecretsCommand),
     /// Check that a deployment's configuration is coherent.
     Doctor {
         /// Directory holding policies, remits and manifests.
@@ -622,6 +625,33 @@ enum AuditCommand {
 }
 
 #[derive(Subcommand)]
+enum SecretsCommand {
+    /// Report the non-secret facts about a handle held in the macOS Keychain.
+    ///
+    /// The lookup runs `security find-generic-password` without `-w`, so the secret is not in
+    /// its output at all. What comes back is the kind and the purposes that kind may serve.
+    Metadata {
+        /// The session the request is attributed to.
+        #[arg(long)]
+        session: String,
+        /// The opaque handle, stored as the Keychain item's service name.
+        #[arg(long)]
+        handle: String,
+        /// Keychain file to search. Defaults to the user's search list.
+        #[arg(long)]
+        keychain: Option<PathBuf>,
+        /// Account every VIGIL-managed secret is stored under.
+        #[arg(long, default_value = "vigil")]
+        account: String,
+        /// JSON file of precompiled grants. Without one, every request is refused.
+        #[arg(long)]
+        grants: Option<PathBuf>,
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand)]
 enum KeysCommand {
     /// Generate the three distinct signing seeds a Core needs.
     Generate {
@@ -933,6 +963,22 @@ fn run(cli: Cli) -> vigil_common::Result<()> {
         }
         Command::Keys(KeysCommand::Generate { out }) => generate_keys(&out),
         Command::Keys(KeysCommand::Public { seed }) => print_public_key(&seed),
+        Command::Secrets(SecretsCommand::Metadata {
+            session,
+            handle,
+            keychain,
+            account,
+            grants,
+            json,
+        }) => secret_metadata(
+            state_db.as_deref(),
+            &session,
+            &handle,
+            keychain.as_deref(),
+            &account,
+            grants.as_deref(),
+            json,
+        ),
         Command::Doctor { policy_dir } => doctor(&policy_dir, state_db.as_deref()),
     }
 }
@@ -2867,7 +2913,7 @@ fn local_status(state_db: Option<&Path>, json: bool) -> vigil_common::Result<()>
         "filesystem_broker": "AVAILABLE",
         "process_broker": "AVAILABLE",
         "network_probe_broker": "AVAILABLE",
-        "secret_broker": "INTERFACE_AND_SIMULATOR_ONLY",
+        "secret_broker": "KEYCHAIN_METADATA_AND_GIT_AUTH",
         "endpoint_fast_path": "SIMULATOR_AVAILABLE",
         "blast_radius_manager": "ACTIVE",
         "session_database": "HEALTHY",
@@ -3376,6 +3422,64 @@ fn generate_keys(out: &Path) -> vigil_common::Result<()> {
     println!("checkpoints. Give the Gateway only the *public* half:");
     println!();
     println!("  vigil keys public {}/capability.key", out.display());
+    Ok(())
+}
+
+/// Report what a Keychain handle is, without reporting what it holds.
+///
+/// Routed through the broker rather than straight at the provider, so the request is checked
+/// against the session's profile grants and recorded in the event log like any other.
+#[allow(clippy::too_many_arguments)]
+fn secret_metadata(
+    state_db: Option<&Path>,
+    session_id: &str,
+    handle: &str,
+    keychain: Option<&Path>,
+    account: &str,
+    grants_path: Option<&Path>,
+    json: bool,
+) -> vigil_common::Result<()> {
+    let store = local_store(state_db)?;
+    let provider = match keychain {
+        Some(path) => vigil_local::KeychainSecretProvider::with_keychain(account, path),
+        None => vigil_local::KeychainSecretProvider::new(account),
+    };
+    // Without a grants file every request is refused. Defaulting to permissive would make the
+    // policy something a caller opts into, which is backwards.
+    let policy = match grants_path {
+        Some(path) => {
+            let raw = std::fs::read_to_string(path)?;
+            let grants: Vec<vigil_local::SecretUseGrant> = serde_json::from_str(&raw)?;
+            vigil_local::SecretBrokerPolicy::new(grants)?
+        }
+        None => vigil_local::SecretBrokerPolicy::deny_all(),
+    };
+
+    let broker = vigil_local::SecretBroker::new(&store, &provider, &policy);
+    let result = broker.metadata(session_id, handle)?;
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&result)?);
+    } else {
+        println!("Handle    {}", result.metadata.handle);
+        println!("Kind      {:?}", result.metadata.kind);
+        println!(
+            "Purposes  {}",
+            result
+                .metadata
+                .supported_purposes
+                .iter()
+                .map(|purpose| purpose.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+        println!("Event     {}", result.event_id);
+        println!();
+        println!(
+            "The secret itself was never read: this lookup runs without `-w`, so the value is \
+             not in its output."
+        );
+    }
     Ok(())
 }
 

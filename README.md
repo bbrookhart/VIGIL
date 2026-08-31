@@ -689,8 +689,9 @@ Console UI · Control plane (tenants/OIDC/RBAC/policy lifecycle) · MCP & A2A ga
 TypeScript SDK · ClickHouse/NATS · Terraform · artifact signing & provenance attestation.
 Portable decision-pipeline session state and approvals are still in memory; local launch
 sessions, semantic broker sessions, normalized event timelines, and budget reservations are
-durable in SQLite. The local secret component is an interface and simulator, not a native
-credential provider. The macOS Endpoint Security fast path and API adapter are built, but System
+durable in SQLite. The local secret component now reads real macOS Keychain items and can
+authenticate to a git remote without the credential reaching the agent; HTTP authentication and
+artifact signing are not implemented and fail rather than claiming a use. The macOS Endpoint Security fast path and API adapter are built, but System
 Extension packaging, activation, signing, and entitled-device enforcement are not. Network
 Extension, `vigild`, XPC Mach-service registration, and the native Control Center are not yet
 implemented. The Endpoint adapter does contain the bounded listener lifecycle, peer verifier,
