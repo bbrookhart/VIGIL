@@ -30,7 +30,7 @@ pub fn normalize(path: &str) -> String {
     // an unusual Unix filename; it also closes the Windows-style traversal spelling.
     let absolute = path.starts_with('/') || path.starts_with('\\');
     let mut stack: Vec<&str> = Vec::new();
-    for component in path.split(|character| character == '/' || character == '\\') {
+    for component in path.split(['/', '\\']) {
         match component {
             "" | "." => {}
             ".." => {
