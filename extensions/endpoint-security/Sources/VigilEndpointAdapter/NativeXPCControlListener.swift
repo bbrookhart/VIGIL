@@ -227,7 +227,13 @@ public final class NativeXPCControlListener: @unchecked Sendable {
                     peer.refreshIdleTimeout(milliseconds: peerIdleTimeoutMilliseconds)
                 } else {
                     remove(peer)
-                    xpc_connection_cancel(peer.connection)
+                    // Cancellation may discard a message that is only queued locally. The
+                    // barrier runs after the fixed rejection has been handed to XPC, so an
+                    // unauthenticated peer receives exactly one useful response before its
+                    // connection is torn down.
+                    xpc_connection_send_barrier(peer.connection) {
+                        xpc_connection_cancel(peer.connection)
+                    }
                 }
             } else {
                 remove(peer)
