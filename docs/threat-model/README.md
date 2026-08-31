@@ -114,8 +114,12 @@ Stated plainly, because a threat model that only lists solved problems is market
    the causal controls, not by claiming better patterns.
 3. **Value flow catches mechanical transformation, not paraphrase.** A model that re-types a
    secret with one character changed defeats it. Documented in `flow.rs`.
-4. **Lexical path normalization cannot see through symlinks.** The Gateway is supposed to
-   resolve against the real filesystem before executing; that resolution is not implemented.
+4. **Symlink resolution depends on the Gateway sharing the filesystem.** `PathRoots` is now
+   checked twice: lexically, then against the real filesystem, so `/workspace/link -> /etc`
+   followed by `/workspace/link/passwd` is refused (`is_inside_any_resolved`). The resolved
+   check only ever *adds* a denial, so it cannot loosen the lexical one. It is only meaningful
+   where the Gateway can see the paths it is deciding about; where it cannot, the lexical
+   check stands alone and the symlink case is not covered.
 5. **Session state is still in memory.** Provenance and budgets are lost on restart, which
    makes VIGIL *more* restrictive (unknown provenance is treated as maximally influenced),
    not less. Audit evidence is now durable and resumes its chain across restarts.

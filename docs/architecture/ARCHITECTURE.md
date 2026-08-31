@@ -154,13 +154,21 @@ reaching the operator at all, so approval fatigue stops being a usable pressure 
 Process lineage is durable. Every process VIGIL launches — the child of `vigil run`, each child of
 the process broker — becomes a node with an opaque `node_id`, a parent pointer, and a generation.
 A partial unique index over live PIDs refuses to let two live nodes in one session claim one PID,
-so a recycled PID becomes a separate node rather than inheriting an identity. This is the
-prerequisite for process-tree termination, which is not built: nothing here observes grandchildren
-or any process VIGIL did not start, and an absence in the graph is not evidence of absence.
+so a recycled PID becomes a separate node rather than inheriting an identity.
+
+That graph is what `vigil contain --terminate` walks. Each node carries the kernel's start time and
+command as read at spawn, and termination re-reads them immediately before signalling: a PID whose
+identity no longer matches is left running and reported rather than killed (ADR 0041). Children are
+stopped before their parents, so nothing is orphaned to `launchd` mid-pass.
+
+The graph still bounds what can be reached. Nothing here observes grandchildren or any process
+VIGIL did not start, so an absence in the graph is not evidence of absence, and a process that
+escaped attribution is not stopped.
 
 None of this is OS enforcement. Degradation withholds authority from *brokered* requests; a process
-that bypasses the brokers is unaffected, and containing an already-running process still requires
-the entitled half of the product.
+that bypasses the brokers is unaffected. Termination reaches what VIGIL recorded, but a
+one-second-granularity start time is evidence of identity rather than proof of it, and the
+OS-verified identity that would make it proof still requires the entitled half of the product.
 
 ## Detections, incidents, and response
 
