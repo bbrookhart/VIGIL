@@ -207,6 +207,17 @@ public struct VerifiedNativeNetworkSnapshot: Sendable {
     let snapshot: NativeNetworkSnapshot
 
     public var generation: UInt64 { snapshot.generation }
+    public var expiresAtUnixMilliseconds: Int64 { snapshot.expiresAtUnixMilliseconds }
+}
+
+public struct NativeNetworkPolicyLease: Equatable, Sendable {
+    public let generation: UInt64
+    public let expiresAtUnixMilliseconds: Int64
+
+    fileprivate init(generation: UInt64, expiresAtUnixMilliseconds: Int64) {
+        self.generation = generation
+        self.expiresAtUnixMilliseconds = expiresAtUnixMilliseconds
+    }
 }
 
 private struct NativeBudgetState {
@@ -224,6 +235,19 @@ public final class NativeNetworkPolicyState: @unchecked Sendable {
 
     public var generation: UInt64? {
         lock.withLock { snapshot?.generation }
+    }
+
+    /// A coherent policy lease snapshot for lifecycle health publication. This is intentionally
+    /// separate from flow evaluation so signing and file I/O remain outside `handleNewFlow`.
+    public var lease: NativeNetworkPolicyLease? {
+        lock.withLock {
+            snapshot.map {
+                NativeNetworkPolicyLease(
+                    generation: $0.generation,
+                    expiresAtUnixMilliseconds: $0.expiresAtUnixMilliseconds
+                )
+            }
+        }
     }
 
     public func install(_ verified: VerifiedNativeNetworkSnapshot) throws {

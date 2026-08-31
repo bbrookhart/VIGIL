@@ -64,6 +64,20 @@ Two rules govern every row:
 | Network generation persistence fails or the same generation names different envelope bytes | Installation stops before activation. A restart may restore only the exact envelope committed at the durable replay floor. | Unaffected |
 | Network filter preferences fail to load/save/remove or do not round-trip exactly | The containing app reports failure or configuration drift; it never claims the filter is enabled. | Unaffected |
 | Network filter preference operation times out | The outcome is reported unknown and that controller instance refuses every subsequent operation, preventing a blind mutation retry. | Unaffected |
+| Any network enforcement health signal is missing | `FULLY ENFORCED` is impossible. An inactive/unknown extension reports `OBSERVE ONLY`; missing downstream evidence reports `DEGRADED`. | Unaffected |
+| Network provider/flow evidence is stale, future-dated, expired, or generation-mismatched | Health reports `BROKEN`; prior observations cannot authorize a current protection claim. | Unaffected |
+| Entitled allow/deny probe has the wrong outcome | Health reports `BROKEN`, including when the denied destination is reachable. | Unaffected |
+| Provider-health attestation is forged, malformed, oversized, wrong-instance/provider, or signed by an unknown key | Verification rejects it before health fields are trusted; ready evidence cannot be constructed. | Unaffected |
+| Provider-health transport is missing, symlinked, oversized, insecure, partial, or tampered | The reader returns no verified health. Publication is atomic and never runs in the flow callback. | Unaffected |
+| Provider-health Keychain state is unavailable, corrupt, or races creation | Provider startup fails; corrupt state is never overwritten and a creation loser reloads the winning identity. | Unaffected |
+| Provider-health publication has no current policy or trustworthy clock | No attestation is published; failure counters advance and health cannot become ready. | Unaffected |
+| Provider-health enrollment is missing, malformed, wrong-instance/provider, or cannot authenticate fresh health | No trust pin or ready evidence is created. | Unaffected |
+| An enrolled provider-health identity changes or the host pin is corrupt | Automatic rotation is refused and health remains unavailable pending explicit recovery. | Unaffected |
+| The durable network installation identity is missing, malformed, or races creation | Runtime construction fails or reloads the winning insert; it never replaces corrupt identity or verifies another installation's health. | Unaffected |
+| Network policy-signing Keychain state is unavailable or corrupt | Bootstrap publication and preference enablement stop; no embedded or replacement key is used. | Unaffected |
+| Bootstrap policy publication fails before filter configuration | Preferences are not mutated; a provider is never pointed at policy that was not durably committed. | Unaffected |
+| Automatic network-policy maintenance sees an inactive extension or non-exact preferences | No new generation is published. Maintenance cannot preserve authority for an inactive, disabled, or drifted filter. | Unaffected |
+| Provider policy reload fails, observes no clock, or sees incoherent durable state | The last verified snapshot remains active only until its signed exclusive expiry; no authority is extended and managed traffic then fails closed. | Unaffected |
 | System clock moves backwards | Expiry uses `max(wall, high water)`, so expired leases and approvals stay expired. A material regression fires `VIGIL-L032`. | Unaffected |
 | System clock moves far forward | Leases and approvals expire early. Fails safe, and is not detected — see ADR 0030. | Unaffected |
 | Clock state row is unreadable | The reading falls back to the wall clock for that call; monotonicity is lost until it is readable again. | Unaffected |

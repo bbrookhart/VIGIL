@@ -43,6 +43,12 @@ test-macos-network-adapter: ## Run the native Network Extension adapter test sui
 	SWIFT_MODULE_CACHE_PATH=/tmp/vigil-network-swift-modules \
 	swift test --disable-sandbox --package-path extensions/network-filter
 
+.PHONY: test-macos-app-support
+test-macos-app-support: ## Run containing-app System Extension lifecycle tests (macOS only)
+	CLANG_MODULE_CACHE_PATH=/tmp/vigil-support-clang-modules \
+	SWIFT_MODULE_CACHE_PATH=/tmp/vigil-support-swift-modules \
+	swift test --disable-sandbox --package-path platform/macos/VigilMacSupport
+
 .PHONY: build-macos-app
 build-macos-app: ## Build and inspect the unsigned macOS app/System Extension graph
 	xcodebuild -project platform/macos/VigilMac.xcodeproj \
@@ -72,7 +78,7 @@ verify: fmt-check lint test ## Everything CI runs
 	@echo "✓ all gates passed"
 
 .PHONY: verify-macos
-verify-macos: verify test-macos-adapter test-macos-network-adapter build-macos-app ## Portable gates plus native macOS products
+verify-macos: verify test-macos-adapter test-macos-network-adapter test-macos-app-support build-macos-app ## Portable gates plus native macOS products
 	@echo "✓ all portable and macOS product gates passed"
 
 .PHONY: fmt
