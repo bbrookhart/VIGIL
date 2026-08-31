@@ -203,9 +203,10 @@ jobs:
     name: Fuzz smoke
     runs-on: ubuntu-latest
     # Targets are discovered with `cargo fuzz list`, so adding one to fuzz/Cargo.toml is
-    # enough to have it replayed and smoked here. Ten targets cover canonicalization, capability
-    # tokens, policy bundles, network analysis, path traversal, action requests, MCP argument
-    # extraction, MCP manifests, Git remote hosts, and reconciliation.
+    # enough to have it replayed and smoked here. Twelve targets cover canonicalization,
+    # capability tokens, policy bundles, network analysis, path traversal, action requests, MCP
+    # argument extraction, MCP manifests, Git remote hosts, reconciliation, `ps` process
+    # identity, and Keychain attribute dumps.
     #
     # Short passes so a newly-introduced panic is caught on the commit that introduces it.
     # Sustained campaigns run out of band; 60s per target explores the shallow input space

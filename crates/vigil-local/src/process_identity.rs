@@ -120,6 +120,16 @@ pub fn identify(pid: u32) -> Result<Option<ProcessIdentity>> {
             .stderr(Stdio::null()),
     )?;
 
+    parse_ps_output(pid, &output)
+}
+
+/// Turn one `ps -o lstart=,state=,comm=` line into an identity.
+///
+/// Separated from [`identify`] so it can be exercised against arbitrary bytes without
+/// spawning anything. `ps` output is not attacker-controlled in the ordinary case, but an
+/// executable path is, and this is the code that turns bytes into something termination acts
+/// on.
+pub fn parse_ps_output(pid: u32, output: &str) -> Result<Option<ProcessIdentity>> {
     let line = output.trim();
     if line.is_empty() {
         // `ps` prints nothing and exits non-zero for a pid that does not exist.

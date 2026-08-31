@@ -94,7 +94,7 @@ pub use policy::{
     LeaseStatus, LocalAction, LocalDecision, LocalProfile, LocalRequest, RiskState,
 };
 pub use process_broker::{ProcessBroker, ProcessBrokerResult, ProcessRequest};
-pub use process_identity::{identify, ProcessIdentity};
+pub use process_identity::{identify, parse_ps_output, ProcessIdentity};
 pub use provenance::{
     NewProcess, ProcessEdge, ProcessGraph, ProcessNode, ProcessStatus, MAX_PROCESS_GENERATION,
 };
