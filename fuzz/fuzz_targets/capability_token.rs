@@ -12,7 +12,7 @@
 
 use libfuzzer_sys::fuzz_target;
 use std::sync::Arc;
-use vigil_capability::{CapabilityVerifier, InMemoryNonceStore, NonceStore, PresentedAction};
+use vigil_capability::{CapabilityVerifier, InMemoryNonceStore, PresentedAction};
 use vigil_common::{ContentHash, FixedClock};
 
 fuzz_target!(|data: &[u8]| {

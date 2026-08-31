@@ -340,8 +340,8 @@ mod tests {
             .expect("identify")
             .expect("still holds the pid");
         assert!(zombie.is_zombie, "{zombie:?}");
-        assert!(zombie.executable.contains("defunct"), "{zombie:?}");
-        // The start time is unchanged: it is the same process, now dead.
+        // `ps` output for a zombie is platform-specific: GNU may render `<defunct>`, while
+        // BSD/macOS may retain the command name. The explicit process state is the contract.
         sleeper.0.wait().expect("reap");
     }
 }

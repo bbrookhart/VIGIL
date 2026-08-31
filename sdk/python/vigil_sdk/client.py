@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Any
 
@@ -54,10 +55,31 @@ class VigilClient:
         timeout_seconds: float = 5.0,
         auth_token: str | None = None,
     ) -> None:
-        self._core_url = core_url.rstrip("/")
-        self._gateway_url = (gateway_url or core_url).rstrip("/")
+        self._core_url = self._validated_base_url("core_url", core_url)
+        self._gateway_url = self._validated_base_url(
+            "gateway_url", gateway_url or core_url
+        )
+        if timeout_seconds <= 0 or timeout_seconds > 30:
+            raise ValueError("timeout_seconds must be greater than zero and at most 30")
         self._timeout = timeout_seconds
         self._auth_token = auth_token
+
+    @staticmethod
+    def _validated_base_url(field: str, value: str) -> str:
+        parsed = urllib.parse.urlsplit(value)
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError(
+                f"{field} must be an http(s) origin or base path without credentials, "
+                "a query, or a fragment"
+            )
+        return value.rstrip("/")
 
     # ---------------------------------------------------------------- decisions
 
@@ -160,9 +182,15 @@ class VigilClient:
         if extra_headers:
             headers.update(extra_headers)
 
-        request = urllib.request.Request(url, data=data, headers=headers, method="POST")
+        # The constructor validates both bases as HTTP(S) URLs; this operation only appends
+        # constant paths to those bases.
+        request = urllib.request.Request(  # noqa: S310
+            url, data=data, headers=headers, method="POST"
+        )
         try:
-            with urllib.request.urlopen(request, timeout=self._timeout) as response:
+            with urllib.request.urlopen(  # noqa: S310
+                request, timeout=self._timeout
+            ) as response:
                 return json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as error:
             raw = error.read().decode("utf-8", errors="replace")

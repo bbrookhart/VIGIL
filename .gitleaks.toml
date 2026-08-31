@@ -37,6 +37,9 @@ regexes = [
   '''postgres://admin:hunter2@db\.internal:5432/app''',
   # Placeholder passwords in redaction and URL tests.
   '''(user:pass@|:hunter2@|password.{0,3}=.{0,3}hunter2)''',
+  # Swift type declarations for locally generated Curve25519 signing keys. These match the
+  # type signature, never a key value, and avoid excluding the files that handle key material.
+  '''(?:privateKey|_ key|key):\s*Curve25519\.Signing\.PrivateKey''',
 ]
 
 # The injection evaluation corpus contains attack strings by construction — that is its

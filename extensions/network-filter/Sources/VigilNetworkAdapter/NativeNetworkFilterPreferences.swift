@@ -117,9 +117,31 @@ private final class SystemNativeNetworkFilterPreferences: NativeNetworkFilterPre
         set { manager.grade = newValue }
     }
 
-    func loadFromPreferences() async throws { try await manager.loadFromPreferences() }
-    func saveToPreferences() async throws { try await manager.saveToPreferences() }
-    func removeFromPreferences() async throws { try await manager.removeFromPreferences() }
+    func loadFromPreferences() async throws {
+        try await bridge(manager.loadFromPreferences)
+    }
+
+    func saveToPreferences() async throws {
+        try await bridge(manager.saveToPreferences)
+    }
+
+    func removeFromPreferences() async throws {
+        try await bridge(manager.removeFromPreferences)
+    }
+
+    /// Use NetworkExtension's completion-handler surface explicitly. Its async overlay sends
+    /// the non-Sendable manager across an isolation boundary under Swift 6 strict concurrency.
+    private func bridge(_ operation: (@escaping (Error?) -> Void) -> Void) async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            operation { error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume()
+                }
+            }
+        }
+    }
 }
 
 private final class NativeNetworkPreferenceRace: @unchecked Sendable {

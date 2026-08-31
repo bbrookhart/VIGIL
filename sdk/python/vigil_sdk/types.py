@@ -81,7 +81,7 @@ class TrustLevel(str, Enum):
     EXTERNAL_UNTRUSTED = "EXTERNAL_UNTRUSTED"
 
     @classmethod
-    def conservative_default(cls) -> "TrustLevel":
+    def conservative_default(cls) -> TrustLevel:
         """The label to assume when a source is unknown."""
         return cls.EXTERNAL_UNTRUSTED
 
@@ -100,7 +100,7 @@ class TaintKind(str, Enum):
     """Categories of sensitive or dangerous data."""
 
     UNTRUSTED_INSTRUCTION = "UNTRUSTED_INSTRUCTION"
-    SECRET = "SECRET"
+    SECRET = "SECRET"  # noqa: S105 - a taint label, not a credential
     CREDENTIAL = "CREDENTIAL"
     PII = "PII"
     FINANCIAL_DATA = "FINANCIAL_DATA"
@@ -300,7 +300,7 @@ class DecisionResponse:
     raw: dict[str, Any]
 
     @classmethod
-    def from_wire(cls, payload: dict[str, Any]) -> "DecisionResponse":
+    def from_wire(cls, payload: dict[str, Any]) -> DecisionResponse:
         return cls(
             decision=Decision(payload["decision"]),
             decision_id=payload.get("decision_id", ""),

@@ -53,4 +53,8 @@ target-version = "py310"
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "S", "C4", "RET", "SIM"]
 # S101 (assert) is fine in tests; the SDK itself does not use bare asserts for control flow.
-per-file-ignores = { "tests/*" = ["S101"] }
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]
+# These public exception names are retained for API compatibility.
+"vigil_sdk/client.py" = ["N818"]
+"vigil_sdk/guard.py" = ["N818"]
