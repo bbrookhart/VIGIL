@@ -9,7 +9,7 @@ function count.
 
 | Evidence | Count |
 |---|---:|
-| Rust test entry points | 734 |
+| Rust test entry points | 735 |
 | Swift test entry points | 199 |
 | Python test functions | 11 |
 | Adversarial harness tests | 25 |
