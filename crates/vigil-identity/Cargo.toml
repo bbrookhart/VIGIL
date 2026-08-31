@@ -1,0 +1,17 @@
+[package]
+name = "vigil-identity"
+description = "Caller authentication: verified workload identities established from transport evidence."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+vigil-common = { workspace = true }
+vigil-protocol = { workspace = true }
+
+async-trait = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

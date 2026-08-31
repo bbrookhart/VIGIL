@@ -1,0 +1,19 @@
+tenant: acme
+gateway:
+  # Placeholder only, so the chart renders in CI. A real deployment derives this from the
+# Core signing seed with `vigil keys public capability.key` — the Gateway receives the
+# public half and never the seed.
+  capabilityPublicKey: "0000000000000000000000000000000000000000000000000000000000000000"
+auth:
+  peerIdentity:
+    trustedPeers: ["10.0.0.1"]
+  registrations:
+    - spiffeId: spiffe://example.org/ns/agents/sa/support
+      tenantId: acme
+      agentId: customer-support-assistant
+    - spiffeId: spiffe://example.org/ns/console/sa/operator
+      tenantId: acme
+      principalId: operator-1
+      roles: [SupportLead]
+networkPolicy:
+  agentNamespaces: [agents]

@@ -1,0 +1,73 @@
+# Controls protecting VIGIL itself, and the multi-agent trust graph.
+#
+# Why: Invariant 4 says trust cannot self-escalate. An agent that can edit policy, mark
+# untrusted data trusted, or delegate more authority than it holds has defeated every other
+# control in the system, so these rules deny rather than gate on approval — the approval
+# prompt itself would be attacker-influenced.
+version: base-integrity
+description: Self-protection, privilege and delegation rules.
+default_effect: deny
+
+rules:
+  - id: self-modification-001
+    description: Agents may not modify VIGIL policy, remits, manifests or their own limits.
+    effect: deny
+    severity: critical
+    when:
+      resources:
+        - "vigil.*"
+        - "*policy*"
+        - "*remit*"
+        - "net:*.vigil.internal*"
+    reason_codes: [SELF_MODIFICATION_ATTEMPT]
+    obligations:
+      - type: alert
+        severity: CRITICAL
+
+  - id: privilege-change-001
+    description: Identity and permission changes are Tier 4 and always require approval.
+    effect: require_approval
+    severity: critical
+    when:
+      side_effects: [privilege_change]
+    reason_codes: [APPROVAL_REQUIRED, PRIVILEGE_SEEKING]
+    obligations:
+      - type: human_approval
+        approver_roles: [TenantAdmin, PlatformAdmin]
+        ttl_seconds: 300
+      - type: alert
+        severity: HIGH
+
+  - id: delegation-depth-001
+    description: >
+      Delegation chains deeper than four hops are denied. Beyond that depth the original
+      principal's intent is no longer meaningfully represented, and recursive delegation is a
+      denial-of-wallet vector.
+    effect: deny
+    severity: high
+    when:
+      action_kinds: [delegation]
+      delegation_depth_min: 4
+    reason_codes: [DELEGATION_DEPTH_EXCEEDED]
+
+  - id: delegation-untrusted-001
+    description: Work steered by untrusted content may not be delegated onward.
+    effect: deny
+    severity: high
+    when:
+      action_kinds: [delegation]
+      untrusted_instruction_influence: true
+    reason_codes: [DELEGATION_PRIVILEGE_EXPANSION, POISONED_AGENT_MESSAGE]
+
+  - id: denied-retry-pattern-001
+    description: >
+      An agent that has already been denied several times in a session and is still probing
+      is either broken or being driven. Either way, the session should stop.
+    effect: terminate_session
+    severity: critical
+    when:
+      prior_denials_min: 5
+    reason_codes: [DENIED_ACTION_RETRY_PATTERN, BEHAVIORAL_ANOMALY]
+    obligations:
+      - type: alert
+        severity: CRITICAL

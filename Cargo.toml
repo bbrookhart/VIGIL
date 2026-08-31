@@ -1,0 +1,77 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/vigil-common",
+    "crates/vigil-protocol",
+    "crates/vigil-policy",
+    "crates/vigil-remit",
+    "crates/vigil-capability",
+    "crates/vigil-trace",
+    "crates/vigil-detect",
+    "crates/vigil-audit",
+    "crates/vigil-core",
+    "crates/vigil-gateway",
+    "crates/vigil-identity",
+    "crates/vigil-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+license = "Apache-2.0"
+repository = "https://github.com/bbrookhart/VIGIL"
+authors = ["VIGIL Contributors"]
+
+[workspace.dependencies]
+vigil-common = { path = "crates/vigil-common", version = "0.1.0" }
+vigil-protocol = { path = "crates/vigil-protocol", version = "0.1.0" }
+vigil-policy = { path = "crates/vigil-policy", version = "0.1.0" }
+vigil-remit = { path = "crates/vigil-remit", version = "0.1.0" }
+vigil-capability = { path = "crates/vigil-capability", version = "0.1.0" }
+vigil-trace = { path = "crates/vigil-trace", version = "0.1.0" }
+vigil-detect = { path = "crates/vigil-detect", version = "0.1.0" }
+vigil-audit = { path = "crates/vigil-audit", version = "0.1.0" }
+vigil-core = { path = "crates/vigil-core", version = "0.1.0" }
+vigil-gateway = { path = "crates/vigil-gateway", version = "0.1.0" }
+vigil-identity = { path = "crates/vigil-identity", version = "0.1.0" }
+
+async-trait = "0.1"
+axum = { version = "0.8", features = ["json", "macros"] }
+base64 = "0.22"
+chrono = { version = "0.4", features = ["serde", "clock"], default-features = false }
+clap = { version = "4", features = ["derive", "env"] }
+ed25519-dalek = { version = "2", features = ["rand_core", "pkcs8", "pem"] }
+hex = "0.4"
+idna = "1"
+percent-encoding = "2"
+rand = "0.8"
+rand_core = "0.6"
+regex = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+serde_yaml_ng = "0.10"
+sha2 = "0.10"
+thiserror = "2"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "signal", "net"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["trace", "limit", "timeout"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+url = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+
+proptest = "1"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
+
+[profile.bench]
+inherits = "release"
+debug = true

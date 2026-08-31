@@ -1,0 +1,106 @@
+# Narrowing rules for the customer-support-assistant agent.
+#
+# Why: the base bundle is default-deny, so an agent does nothing until something here permits
+# it. These rules are the written-down version of what the support assistant is for, and they
+# are deliberately specific — `resources` names exact tools, not a wildcard.
+#
+# Relationship to the remit: the remit (`remits/customer-support-assistant.yaml`) declares
+# purpose, budgets and data boundaries and is evaluated as its own pipeline stage. These
+# rules are the authorization half. Both must permit an action; neither can waive the other.
+version: agent-customer-support-assistant
+description: Tool permissions for the customer support assistant.
+default_effect: deny
+
+rules:
+  - id: support-remit-001
+    description: Read customer support records. The agent's core read path.
+    effect: allow
+    severity: info
+    when:
+      action_kinds: [tool_call]
+      resources: ["read_customer_record"]
+      operations: [read]
+      untrusted_instruction_influence: false
+    reason_codes: [WITHIN_REMIT]
+
+  - id: support-remit-002
+    description: Create support tickets. A reversible internal mutation.
+    effect: allow_with_constraints
+    severity: info
+    when:
+      action_kinds: [tool_call]
+      resources: ["create_ticket"]
+      untrusted_instruction_influence: false
+    reason_codes: [WITHIN_REMIT]
+    constraints:
+      - type: max_uses
+        uses: 1
+      - type: timeout_ms
+        ms: 10000
+
+  - id: support-remit-003
+    description: >
+      Drafting an email is not sending one. Drafts stay inside the boundary, so they are
+      permitted; the send is governed by support-remit-004.
+    effect: allow
+    severity: info
+    when:
+      action_kinds: [tool_call]
+      resources: ["send_email"]
+      operations: [draft]
+    reason_codes: [WITHIN_REMIT]
+
+  - id: support-remit-004
+    description: >
+      Sending email leaves the trust boundary and always requires a human to approve the
+      exact recipients and body. This is the Demo 3 path.
+    effect: require_approval
+    severity: high
+    when:
+      action_kinds: [tool_call]
+      resources: ["send_email"]
+      operations: [send]
+    reason_codes: [APPROVAL_REQUIRED]
+    obligations:
+      - type: human_approval
+        approver_roles: [SupportLead, SecurityAnalyst, TenantAdmin]
+        ttl_seconds: 900
+      - type: brokered_credentials
+        credential_ref: mail-provider-api-key
+      - type: evidence_capture
+        stream: outbound-email
+
+  - id: support-remit-005
+    description: >
+      Fetching a URL the user asked about is in remit, but the result is untrusted content
+      and is size-bounded so a hostile page cannot flood the context window.
+    effect: allow_with_constraints
+    severity: low
+    when:
+      action_kinds: [tool_call]
+      resources: ["fetch_url"]
+    reason_codes: [WITHIN_REMIT]
+    constraints:
+      - type: max_response_bytes
+        bytes: 524288
+      - type: timeout_ms
+        ms: 10000
+
+  - id: support-forbidden-001
+    description: >
+      Goals the remit explicitly forbids. Listed as policy as well as remit so that a remit
+      loading failure cannot silently remove them.
+    effect: deny
+    severity: critical
+    when:
+      action_kinds: [tool_call]
+      resources:
+        - "*credential*"
+        - "*password*"
+        - "transfer_funds"
+        - "*iam*"
+        - "*infrastructure*"
+    reason_codes: [FORBIDDEN_GOAL, OUT_OF_REMIT_TOOL]
+    obligations:
+      - type: alert
+        severity: CRITICAL

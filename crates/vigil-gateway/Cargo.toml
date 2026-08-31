@@ -1,0 +1,30 @@
+[package]
+name = "vigil-gateway"
+description = "The VIGIL action gateway: the Policy Enforcement Point that holds tool credentials and admits only capability-bearing actions."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+vigil-capability = { workspace = true }
+vigil-common = { workspace = true }
+vigil-identity = { workspace = true }
+vigil-protocol = { workspace = true }
+
+async-trait = { workspace = true }
+axum = { workspace = true }
+chrono = { workspace = true }
+ed25519-dalek = { workspace = true }
+hex = { workspace = true }
+serde_yaml_ng = { workspace = true }
+tracing-subscriber = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tower-http = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }

@@ -1,0 +1,126 @@
+{{- if not .Values.tenant }}
+{{- fail "tenant must be set: VIGIL scopes every decision, session and audit chain by tenant, and there is no safe default." }}
+{{- end }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "vigil.fullname" . }}-core
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "vigil.labels" . | nindent 4 }}
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "vigil.fullname" . }}-core
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "vigil.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+  selector: {{- include "vigil.coreSelectorLabels" . | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "vigil.fullname" . }}-core
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "vigil.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.core.replicaCount }}
+  selector:
+    matchLabels: {{- include "vigil.coreSelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "vigil.labels" . | nindent 8 }}
+        app.kubernetes.io/component: core
+    spec:
+      serviceAccountName: {{ include "vigil.fullname" . }}-core
+      securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      # Spread replicas so a single node failure cannot take out the decision path.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: {{- include "vigil.coreSelectorLabels" . | nindent 14 }}
+      containers:
+        - name: core
+          image: {{ include "vigil.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/usr/local/bin/vigil-core", "/etc/vigil/vigil-core.yaml"]
+          securityContext: {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          env:
+            - name: VIGIL_TENANT
+              value: {{ .Values.tenant | quote }}
+            # Seeds are mounted as files; the binary accepts a path so the value never
+            # appears in an environment listing or a crash dump.
+            - name: VIGIL_CAPABILITY_KEY
+              value: /etc/vigil/keys/capability.key
+            - name: VIGIL_APPROVAL_KEY
+              value: /etc/vigil/keys/approval.key
+            - name: VIGIL_AUDIT_KEY
+              value: /etc/vigil/keys/audit.key
+            - name: RUST_LOG
+              value: info
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources: {{- toYaml .Values.core.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/vigil/vigil-core.yaml
+              subPath: vigil-core.yaml
+              readOnly: true
+            - name: policies
+              mountPath: /etc/vigil/policies
+              readOnly: true
+            - name: keys
+              mountPath: /etc/vigil/keys
+              readOnly: true
+            # readOnlyRootFilesystem is on, so anything that needs to write gets an explicit
+            #, bounded volume.
+            - name: audit
+              mountPath: /var/lib/vigil/audit
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "vigil.fullname" . }}-core-config
+        - name: policies
+          configMap:
+            name: {{ .Values.policies.configMapName }}
+        - name: keys
+          secret:
+            secretName: {{ .Values.core.signingKeysSecret }}
+            defaultMode: 0400
+        - name: audit
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+{{- if .Values.podDisruptionBudget.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "vigil.fullname" . }}-core
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "vigil.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels: {{- include "vigil.coreSelectorLabels" . | nindent 6 }}
+{{- end }}

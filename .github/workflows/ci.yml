@@ -1,0 +1,225 @@
+# VIGIL continuous integration.
+#
+# Every job here corresponds to a claim the README makes. If a claim cannot be checked
+# mechanically it does not belong in the README, and if a job here starts failing the
+# corresponding claim should come out.
+#
+# Actions are pinned by commit SHA rather than tag: a tag is mutable, and a supply-chain
+# product that pulls `@v4` is asking to be compromised by the thing it defends against.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Advisories appear between commits, so the dependency audit also runs on a timer.
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: dtolnay/rust-toolchain@1ff72ee08e3cb84d84adba594e0a297990fc1ed3 # stable
+        with: { toolchain: stable, components: rustfmt }
+      - run: cargo fmt --all -- --check
+
+  lint:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: dtolnay/rust-toolchain@1ff72ee08e3cb84d84adba594e0a297990fc1ed3 # stable
+        with: { toolchain: stable, components: clippy }
+      - uses: Swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2.7.5
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+
+  test:
+    name: Rust tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: dtolnay/rust-toolchain@1ff72ee08e3cb84d84adba594e0a297990fc1ed3 # stable
+        with: { toolchain: stable }
+      - uses: Swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2.7.5
+      - run: cargo test --workspace --locked
+
+  python:
+    name: Python SDK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with: { python-version: "3.11" }
+      - run: pip install -e "sdk/python[dev]"
+      - run: pytest sdk/python/tests -q
+      - run: mypy sdk/python/vigil_sdk
+      - run: ruff check sdk/python
+
+  contract:
+    name: Cross-language contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: dtolnay/rust-toolchain@1ff72ee08e3cb84d84adba594e0a297990fc1ed3 # stable
+        with: { toolchain: stable }
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with: { python-version: "3.11" }
+      - run: pip install -e "sdk/python[dev]"
+      # Both implementations execute the same spec-derived vector file. A divergence in
+      # canonicalization is a signature-forgery primitive, so this is a blocking gate.
+      - run: cargo test -p vigil-common --test canonical_contract
+      - run: cargo test -p vigil-protocol --test sdk_wire_contract
+      - run: pytest sdk/python/tests/test_canonical_contract.py -q
+      # The committed fixture must match what the SDK produces today.
+      - run: |
+          python scripts/generate_wire_fixture.py
+          git diff --exit-code tests/contract/ \
+            || { echo "::error::the SDK wire fixture is stale; run 'make contract-fixtures'"; exit 1; }
+
+  policy:
+    name: Policy bundles
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: dtolnay/rust-toolchain@1ff72ee08e3cb84d84adba594e0a297990fc1ed3 # stable
+        with: { toolchain: stable }
+      - uses: Swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2.7.5
+      # The shipped bundles are executable security configuration; they are validated and
+      # behaviourally tested, not merely parsed.
+      - run: cargo run -q -p vigil-cli --bin vigil -- policy validate policies
+      - run: cargo run -q -p vigil-cli --bin vigil -- remit validate
+      - run: cargo run -q -p vigil-cli --bin vigil -- manifest validate
+      - run: cargo test -p vigil-policy --test policy_behaviour
+
+  supply-chain:
+    name: Dependencies and secrets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with: { fetch-depth: 0 }
+      - uses: dtolnay/rust-toolchain@1ff72ee08e3cb84d84adba594e0a297990fc1ed3 # stable
+        with: { toolchain: stable }
+      - uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
+        with: { token: "${{ secrets.GITHUB_TOKEN }}" }
+      - name: Secret scan
+        # Configured by .gitleaks.toml, which enumerates the synthetic credentials VIGIL's
+        # DLP tests need. The allowlist is per-value, not per-directory, so a real secret
+        # pasted into a test still fails.
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.6
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          GITLEAKS_CONFIG: .gitleaks.toml
+
+  sbom:
+    name: SBOM
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: dtolnay/rust-toolchain@1ff72ee08e3cb84d84adba594e0a297990fc1ed3 # stable
+        with: { toolchain: stable }
+      - run: cargo install cargo-cyclonedx --locked
+      - run: cargo cyclonedx --format json --all
+      - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: sbom
+          path: "**/*.cdx.json"
+
+  helm:
+    name: Helm chart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: azure/setup-helm@fe7b79cd5ee1e45176fcad797de68ecaf3ca4f6c # v4.2.0
+      - run: helm lint deploy/helm/vigil -f deploy/helm/vigil/ci/test-values.yaml
+      - run: helm template vigil deploy/helm/vigil -f deploy/helm/vigil/ci/test-values.yaml > /tmp/rendered.yaml
+      # The guards must fire: a chart that renders without a tenant or without naming agent
+      # namespaces would deploy something that observes rather than enforces.
+      - name: Safety guards must refuse to render
+        run: |
+          ! helm template vigil deploy/helm/vigil >/dev/null 2>&1 \
+            || { echo "::error::the chart rendered with no tenant set"; exit 1; }
+          ! helm template vigil deploy/helm/vigil \
+              -f deploy/helm/vigil/ci/test-values.yaml \
+              --set gateway.replicaCount=3 >/dev/null 2>&1 \
+            || { echo "::error::the chart rendered >1 gateway replica without a shared nonce store"; exit 1; }
+
+  fuzz:
+    name: Fuzz smoke
+    runs-on: ubuntu-latest
+    # Short passes so a newly-introduced panic is caught on the commit that introduces it.
+    # Sustained campaigns run out of band; 60s per target explores the shallow input space
+    # only. See fuzz/README.md.
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: dtolnay/rust-toolchain@1ff72ee08e3cb84d84adba594e0a297990fc1ed3 # nightly
+        with: { toolchain: nightly }
+      - run: cargo install cargo-fuzz --locked
+      - name: Replay known crash artifacts
+        # Committed artifacts are regression tests. A fix that stops working shows up here
+        # before any new fuzzing has to rediscover it.
+        run: |
+          for target in $(cargo +nightly fuzz list); do
+            for artifact in fuzz/artifacts/$target/*; do
+              [ -e "$artifact" ] || continue
+              cargo +nightly fuzz run "$target" "$artifact"
+            done
+          done
+      - name: Smoke each target
+        run: |
+          for target in $(cargo +nightly fuzz list); do
+            cargo +nightly fuzz run "$target" -- -max_total_time=60
+          done
+
+  benchmark:
+    name: Benchmarks
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: dtolnay/rust-toolchain@1ff72ee08e3cb84d84adba594e0a297990fc1ed3 # stable
+        with: { toolchain: stable }
+      - uses: Swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2.7.5
+      # Recorded, not gated: CI runners are too noisy for a latency regression threshold to
+      # be anything but a source of false failures. The published numbers in
+      # docs/operations/benchmarks.md come from documented hardware.
+      - run: cargo bench -p vigil-core --bench decision_pipeline | tee bench.txt
+      - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with: { name: benchmarks, path: bench.txt }
+
+  detection-quality:
+    name: Detection quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: dtolnay/rust-toolchain@1ff72ee08e3cb84d84adba594e0a297990fc1ed3 # stable
+        with: { toolchain: stable }
+      - uses: Swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2.7.5
+      # Precision and recall thresholds are asserted inside the test, so a change that
+      # degrades detection fails the build rather than quietly shipping.
+      - run: cargo test -p vigil-detect --test detection_quality -- --nocapture
+
+  bypass:
+    name: Non-bypassability (kind)
+    runs-on: ubuntu-latest
+    # The proof that the deployment, not the application, is what makes VIGIL unbypassable.
+    # Heavier than the other jobs, so it runs on main and on demand rather than every push.
+    if: github.event_name == 'push' || github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: dtolnay/rust-toolchain@1ff72ee08e3cb84d84adba594e0a297990fc1ed3 # stable
+        with: { toolchain: stable }
+      - uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
+        with: { install_only: true }
+      - run: ./tests/e2e/k8s_bypass.sh

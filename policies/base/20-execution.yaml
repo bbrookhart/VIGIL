@@ -1,0 +1,91 @@
+# Code execution, filesystem and database controls.
+#
+# Why: these are the classes where a single unchecked argument converts an agent into a
+# remote shell. The rules are intentionally blunt — an agent that legitimately needs to run
+# arbitrary commands needs a narrower tool, not a broader policy.
+version: base-execution
+description: Shell, filesystem and database enforcement.
+default_effect: deny
+
+rules:
+  - id: shell-execution-001
+    description: >
+      Shell execution is denied by default. Agents that need a specific command get a tool
+      manifest exposing that command with fixed arguments, which is analyzable; a general
+      shell is not.
+    effect: deny
+    severity: critical
+    when:
+      action_kinds: [shell]
+    reason_codes: [DANGEROUS_SHELL_COMMAND]
+    obligations:
+      - type: alert
+        severity: HIGH
+
+  - id: filesystem-write-001
+    description: Writes outside the agent's declared workspace roots are denied.
+    effect: deny
+    severity: high
+    when:
+      action_kinds: [file]
+      operations: [write, append, delete, chmod, symlink]
+      paths_outside: ["/workspace/", "/tmp/vigil-agent/"]
+    reason_codes: [PATH_OUTSIDE_ALLOWLIST]
+
+  - id: filesystem-sensitive-read-001
+    description: >
+      Reads of credential-bearing paths are denied even inside an allowed root, because the
+      value of these files is exactly what an injection would go looking for.
+    effect: deny
+    severity: critical
+    when:
+      action_kinds: [file]
+      paths:
+        - "*/.ssh/*"
+        - "*/.aws/credentials*"
+        - "*/.kube/config*"
+        - "*/.env"
+        - "*/.env.*"
+        - "/etc/shadow"
+        - "/proc/self/environ"
+    reason_codes: [SECRET_EGRESS]
+    obligations:
+      - type: alert
+        severity: CRITICAL
+
+  - id: database-ddl-001
+    description: Schema and privilege changes from an agent are never routine.
+    effect: deny
+    severity: critical
+    when:
+      action_kinds: [database]
+      operations: [DROP, TRUNCATE, ALTER, GRANT, REVOKE, CREATE]
+    reason_codes: [SQL_OPERATION_FORBIDDEN]
+
+  - id: database-write-001
+    description: Data-modifying statements require approval unless a narrower rule allows them.
+    effect: require_approval
+    severity: high
+    when:
+      action_kinds: [database]
+      operations: [DELETE, UPDATE, INSERT]
+    reason_codes: [APPROVAL_REQUIRED]
+    obligations:
+      - type: human_approval
+        approver_roles: [SecurityAnalyst, TenantAdmin]
+        ttl_seconds: 600
+
+  - id: database-read-001
+    description: Parameterized reads are permitted, bounded in time and rows.
+    effect: allow_with_constraints
+    severity: info
+    when:
+      action_kinds: [database]
+      operations: [SELECT]
+      untrusted_instruction_influence: false
+    reason_codes: [LOW_IMPACT_READ]
+    constraints:
+      - type: sql_operations
+        operations: [SELECT]
+      - type: timeout_ms
+        ms: 10000

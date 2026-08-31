@@ -1,0 +1,52 @@
+{
+  "schema_version": "vigil.v1",
+  "request_id": "req-abc123",
+  "occurred_at": "2026-08-15T16:18:47.059249+00:00",
+  "tenant_id": "acme",
+  "environment_id": "prod",
+  "session_id": "sess-1",
+  "agent_id": "customer-support-assistant",
+  "agent_instance_id": "inst-1",
+  "principal": {
+    "id": "user-1",
+    "kind": "human",
+    "tenant_id": "acme",
+    "roles": [
+      "support-agent"
+    ],
+    "auth_method": null,
+    "mfa": true
+  },
+  "workload_identity": {
+    "id": "spiffe://vigil.test/ns/agents/sa/support",
+    "attestation_method": "mtls",
+    "verified": true
+  },
+  "trace": {},
+  "action": {
+    "kind": "tool_call",
+    "protocol": "native",
+    "tool_id": "send_email",
+    "name": "send_email",
+    "operation": "send",
+    "arguments": {
+      "to": "cfo@acme.example",
+      "body": "Quarterly report"
+    }
+  },
+  "context": {
+    "declared_objective": "answer the customer's billing question",
+    "action_rationale": "the customer asked for a summary by email",
+    "influencing_sources": [
+      {
+        "node_id": "prov-1",
+        "trust_level": "WEB_UNTRUSTED",
+        "origin": "web:https://vendor.example/docs",
+        "content_hash": null
+      }
+    ],
+    "step": 3,
+    "approval_token": null,
+    "adapter_metadata": {}
+  }
+}

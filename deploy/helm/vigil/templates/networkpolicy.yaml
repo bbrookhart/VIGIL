@@ -1,0 +1,145 @@
+{{/*
+  The isolation boundary.
+
+  VIGIL's product promise is that a protected agent cannot reach a protected tool except
+  through the Gateway. Credential custody gets most of the way there — the agent holds no
+  API keys — but an agent with unrestricted network access could still reach an internal
+  service that trusts the network, or a tool that authenticates some other way.
+
+  These policies are what close that. They are the reason the threat model can claim
+  non-bypassability rather than merely asserting it, and `tests/e2e/k8s_bypass.sh` proves
+  them by trying to bypass and failing.
+*/}}
+{{- if .Values.networkPolicy.enabled }}
+{{- if not .Values.networkPolicy.agentNamespaces }}
+{{- fail "networkPolicy.agentNamespaces is empty: without naming the namespaces that run protected agents, nothing restricts their egress and VIGIL observes rather than enforces. Set networkPolicy.enabled=false to acknowledge deploying without the isolation boundary." }}
+{{- end }}
+
+{{- range $namespace := .Values.networkPolicy.agentNamespaces }}
+---
+# Default-deny egress for every pod in an agent namespace.
+#
+# Ordering matters conceptually: this denies everything, and the policy below re-permits the
+# narrow set an agent legitimately needs. A NetworkPolicy that only listed allowed
+# destinations would leave everything else reachable.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "vigil.fullname" $ }}-agent-default-deny-egress
+  namespace: {{ $namespace }}
+  labels:
+    {{- include "vigil.labels" $ | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress: []
+---
+# The only egress a protected agent gets.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "vigil.fullname" $ }}-agent-egress-to-vigil
+  namespace: {{ $namespace }}
+  labels:
+    {{- include "vigil.labels" $ | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    # DNS, or nothing resolves.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $.Values.networkPolicy.dnsNamespace }}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # VIGIL Core, to request decisions.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $.Release.Namespace }}
+          podSelector:
+            matchLabels:
+              {{- include "vigil.coreSelectorLabels" $ | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: 8080
+    # VIGIL Gateway, to execute authorized actions. This is the *only* route to a protected
+    # tool: the Gateway holds the credentials and the agent does not.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $.Release.Namespace }}
+          podSelector:
+            matchLabels:
+              {{- include "vigil.gatewaySelectorLabels" $ | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: 8081
+{{- if $.Values.networkPolicy.allowAgentInternetEgress }}
+    # Explicitly opted in. With this set, an agent can reach arbitrary destinations directly
+    # and VIGIL cannot claim to be unbypassable — it observes rather than enforces.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              # Even when opting out of the boundary, the link-local range stays blocked:
+              # 169.254.169.254 hands out cloud credentials to anything that can reach it.
+              - 169.254.0.0/16
+{{- end }}
+{{- end }}
+
+---
+# VIGIL Core accepts connections only from agent namespaces and the console.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "vigil.fullname" . }}-core-ingress
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "vigil.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "vigil.coreSelectorLabels" . | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        {{- range $namespace := .Values.networkPolicy.agentNamespaces }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $namespace }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: 8080
+
+---
+# The Gateway is the credential holder, so its ingress is the narrowest surface in the
+# deployment: agents only, on one port.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "vigil.fullname" . }}-gateway-ingress
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "vigil.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "vigil.gatewaySelectorLabels" . | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        {{- range $namespace := .Values.networkPolicy.agentNamespaces }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $namespace }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: 8081
+{{- end }}

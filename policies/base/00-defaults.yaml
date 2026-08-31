@@ -1,0 +1,65 @@
+# Baseline posture.
+#
+# Why: default-deny is the only posture in which forgetting to write a rule is safe. Every
+# other file in this repository narrows that default for a specific, reviewed case.
+#
+# Failure mode: if no rule in the merged bundle matches an action, it is denied with
+# POLICY_DEFAULT_DENY. That is intended. An agent hitting this in development means a tool
+# needs a manifest and a rule, not that the default should change.
+version: base-defaults
+description: Baseline default-deny posture and the narrow low-risk read exemption.
+default_effect: deny
+
+rules:
+  # Observational and low-risk reads are the one class where a wrong deny costs more than a
+  # wrong allow: they have no side effect to undo. They still require the action to be
+  # in-remit — remit evaluation is a separate pipeline stage and is not waived here.
+  - id: base-allow-observational
+    description: Local computation with no observable external effect.
+    effect: allow
+    severity: info
+    when:
+      side_effects: [observational]
+      untrusted_instruction_influence: false
+    reason_codes: [LOW_IMPACT_READ]
+
+  - id: base-allow-internal-read
+    description: Reads inside the trust boundary, when no untrusted content is driving them.
+    effect: allow
+    severity: info
+    when:
+      side_effects: [internal_read]
+      untrusted_instruction_influence: false
+    reason_codes: [LOW_IMPACT_READ]
+
+  # Reads that *are* driven by untrusted content still happen — summarizing a fetched page is
+  # the normal case — but they carry a constraint so a "read" cannot quietly become a large
+  # data pull used for exfiltration staging.
+  - id: base-constrain-untrusted-driven-read
+    description: Reads influenced by untrusted content are size- and time-bounded.
+    effect: allow_with_constraints
+    severity: low
+    when:
+      side_effects: [internal_read, external_read]
+      untrusted_instruction_influence: true
+    reason_codes: [UNTRUSTED_INSTRUCTION_FLOW]
+    constraints:
+      - type: max_response_bytes
+        bytes: 1048576
+      - type: timeout_ms
+        ms: 15000
+
+  # Anything at Tier 4 is a two-person-rule action regardless of which tool provides it.
+  - id: base-critical-tier-requires-approval
+    description: Critical-impact actions always require human approval.
+    effect: require_approval
+    severity: critical
+    when:
+      min_impact_tier: tier4_critical
+    reason_codes: [APPROVAL_REQUIRED]
+    obligations:
+      - type: human_approval
+        approver_roles: [SecurityAnalyst, TenantAdmin, IncidentResponder]
+        ttl_seconds: 600
+      - type: alert
+        severity: HIGH

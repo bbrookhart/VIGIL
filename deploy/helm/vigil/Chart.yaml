@@ -1,0 +1,23 @@
+apiVersion: v2
+name: vigil
+description: |
+  VIGIL runtime security for autonomous AI agents.
+
+  The chart's most important resource is not a Deployment — it is the NetworkPolicy in
+  templates/networkpolicy.yaml. VIGIL's guarantee is that a protected agent cannot reach a
+  protected tool except through the Gateway, and that guarantee is enforced by network
+  isolation, not by the application. Installing this chart without the NetworkPolicy gives
+  you a decision engine, not an enforcement boundary.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - security
+  - ai-agents
+  - prompt-injection
+  - runtime-security
+home: https://github.com/bbrookhart/VIGIL
+sources:
+  - https://github.com/bbrookhart/VIGIL
+maintainers:
+  - name: VIGIL Contributors

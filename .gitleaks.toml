@@ -1,0 +1,48 @@
+# Secret-scanning configuration.
+#
+# A security product that disables its own secret scanning because the scan is noisy has
+# learned the wrong lesson. This allowlist is therefore **narrow and enumerated**: it names
+# the specific synthetic values VIGIL's tests use, rather than excluding whole directories or
+# turning rules off.
+#
+# The consequence is deliberate. Adding a new fake credential to a test requires adding it
+# here, in a diff a reviewer sees. A real credential pasted into a test file is not covered by
+# any of these patterns and still fails the build.
+
+title = "VIGIL"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Synthetic credentials used as test fixtures and detector benchmarks"
+
+# Every value below is invented or is a vendor-published documentation example. VIGIL's DLP
+# detector exists to recognize credential *shapes*, so its tests necessarily contain strings
+# shaped like credentials.
+regexes = [
+  # AWS's own documentation example key. Contains the literal word EXAMPLE.
+  '''AKIAIOSFODNN7EXAMPLE''',
+  # Synthetic Stripe-shaped keys used across DLP, trace and gateway tests.
+  '''sk-live-51H8xQ2eZvKYlo2C[A-Za-z0-9]*''',
+  '''sk-live-(abc123def456|abcdefghijkl|abcdefghijklmnop|DIFFERENTVALUE0000)''',
+  '''sk-live-(mailprovider|supersecretvalue)[A-Za-z0-9-]*''',
+  '''sk-live-51H8xQ2eZvKYlo2X''',
+  # A synthetic GitHub token: the alphabet followed by digits.
+  '''ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789''',
+  # Synthetic Slack- and JWT-shaped values in the DLP pattern tests.
+  '''xox[baprs]-[A-Za-z0-9-]*''',
+  '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+''',
+  # Test database URI with an obviously fake password.
+  '''postgres://admin:hunter2@db\.internal:5432/app''',
+  # Placeholder passwords in redaction and URL tests.
+  '''(user:pass@|:hunter2@|password.{0,3}=.{0,3}hunter2)''',
+]
+
+# The injection evaluation corpus contains attack strings by construction — that is its
+# purpose. It contains no credentials.
+paths = [
+  '''labs/corpora/injection_eval\.json''',
+  # Committed fuzzing crash artifacts are opaque binary regression inputs.
+  '''fuzz/artifacts/.*''',
+]

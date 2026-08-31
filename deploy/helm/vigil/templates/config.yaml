@@ -1,0 +1,77 @@
+{{/*
+  Rendered configuration for both services.
+
+  The authenticator's registrations come from values, so adding an agent is a reviewed change
+  to a file rather than a runtime call — SPIFFE IDs are mapped by explicit registration, never
+  by parsing the path.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "vigil.fullname" . }}-core-config
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "vigil.labels" . | nindent 4 }}
+data:
+  vigil-core.yaml: |
+    listen: "0.0.0.0:8080"
+    policy_dir: /etc/vigil/policies
+    remit_dir: /etc/vigil/policies/remits
+    manifest_file: /etc/vigil/policies/tools/manifests.yaml
+    core:
+      mode: {{ .Values.core.mode }}
+      require_workload_identity: {{ .Values.core.requireWorkloadIdentity }}
+      allow_unregistered_agents: {{ .Values.core.allowUnregisteredAgents }}
+    peer_identity:
+      source: {{ .Values.auth.peerIdentity.source }}
+    {{- if eq .Values.auth.peerIdentity.source "trusted_proxy" }}
+      header: {{ .Values.auth.peerIdentity.header }}
+      trusted_peers:
+      {{- if not .Values.auth.peerIdentity.trustedPeers }}
+      {{- fail "auth.peerIdentity.trustedPeers is empty: an identity header any client may set is not an identity. List the mesh/proxy addresses permitted to assert it." }}
+      {{- end }}
+      {{- range .Values.auth.peerIdentity.trustedPeers }}
+        - {{ . | quote }}
+      {{- end }}
+    {{- end }}
+    auth:
+      method: {{ .Values.auth.method }}
+      registrations:
+      {{- range .Values.auth.registrations }}
+        - spiffe_id: {{ .spiffeId | quote }}
+          tenant_id: {{ .tenantId | quote }}
+          {{- if .agentId }}
+          agent_id: {{ .agentId | quote }}
+          {{- end }}
+          {{- if .principalId }}
+          principal_id: {{ .principalId | quote }}
+          {{- end }}
+          {{- if .roles }}
+          roles: {{ .roles | toJson }}
+          {{- end }}
+      {{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "vigil.fullname" . }}-gateway-config
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "vigil.labels" . | nindent 4 }}
+data:
+  vigil-gateway.yaml: |
+    listen: "0.0.0.0:8081"
+    replicas: {{ .Values.gateway.replicaCount }}
+    # The Gateway trusts Core's *public* key only. Derive it with:
+    #   vigil keys public capability.key
+    trusted_capability_keys:
+      - key_id: cap-k1
+        public_key: {{ .Values.gateway.capabilityPublicKey | default "" | quote }}
+    auth:
+      method: {{ .Values.auth.method }}
+      registrations:
+      {{- range .Values.auth.registrations }}
+      {{- if .agentId }}
+        - spiffe_id: {{ .spiffeId | quote }}
+          tenant_id: {{ .tenantId | quote }}
+          agent_id: {{ .agentId | quote }}
+      {{- end }}
+      {{- end }}
