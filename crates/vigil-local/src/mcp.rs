@@ -1668,7 +1668,10 @@ mod tests {
             .expect_err("an unstable schema must fail before baseline insertion");
         assert!(format!("{error}").contains("exponent"), "{error}");
         assert!(
-            store.mcp_tools("unstable-schema").expect("stored tools").is_empty(),
+            store
+                .mcp_tools("unstable-schema")
+                .expect("stored tools")
+                .is_empty(),
             "a refused schema reached the trusted baseline"
         );
         let _ = std::fs::remove_dir_all(root);
