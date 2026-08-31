@@ -105,4 +105,4 @@ Inspect them with `vigil capabilities <session>`; decide requests with `vigil ap
 
 **This is not yet invariant 3.** Nothing in a broker can reach the grant path, but with no `vigild`
 and no authenticated IPC an agent running as the same user can invoke the CLI itself. See ADR 0017
-and `docs/security/INVARIANTS.md`.
+and `docs/security/SECURITY_INVARIANTS.md`.

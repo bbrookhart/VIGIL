@@ -1,5 +1,9 @@
 # Security model
 
+Implementation maturity is tracked separately in the canonical
+[enforcement status](ENFORCEMENT_STATUS.md); invariant-by-invariant evidence is in
+[SECURITY_INVARIANTS.md](SECURITY_INVARIANTS.md).
+
 ## The claim, stated precisely
 
 VIGIL constrains what an autonomous agent can do **through the interfaces it mediates**. It does

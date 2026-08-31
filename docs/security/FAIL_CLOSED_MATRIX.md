@@ -1,5 +1,8 @@
 # Fail-closed matrix
 
+This page defines failure semantics. For the canonical implementation and activation status of
+each boundary, see [ENFORCEMENT_STATUS.md](ENFORCEMENT_STATUS.md).
+
 What happens to a managed agent session, and to the rest of the machine, when a VIGIL component
 fails.
 
