@@ -255,9 +255,20 @@ jobs:
           done
       - name: Smoke each target
         run: |
+          status=0
           for target in $(cargo +nightly fuzz list); do
-            cargo +nightly fuzz run "$target" -- -max_total_time=60
+            echo "::group::fuzz $target"
+            cargo +nightly fuzz run "$target" -- -max_total_time=60 || status=1
+            echo "::endgroup::"
           done
+          exit "$status"
+      - name: Upload fuzz artifacts after a finding
+        if: failure()
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: fuzz-artifacts
+          path: fuzz/artifacts/
+          if-no-files-found: ignore
 
   benchmark:
     name: Benchmarks
