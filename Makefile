@@ -74,7 +74,7 @@ test-contract: $(PY) ## Run the cross-language contract tests
 # ---------------------------------------------------------------- quality gates
 
 .PHONY: verify
-verify: fmt-check lint test ## Everything CI runs
+verify: fmt-check lint test evidence-check docs-check ## Everything CI runs
 	@echo "✓ all gates passed"
 
 .PHONY: verify-macos
@@ -104,6 +104,28 @@ audit-deps: ## Check dependencies for known advisories (requires cargo-audit)
 .PHONY: demo
 demo: ## Run the blocked-injection and safe-action demonstrations
 	cargo run -q -p vigil-core --example demo
+
+.PHONY: recruiter-demo
+recruiter-demo: ## Run the four-part local reviewer demonstration
+	./scripts/recruiter_demo.sh
+
+.PHONY: evaluate
+evaluate: ## Run release, adversarial, and detection-quality security evaluation
+	cargo test -p vigil-cli --test release_gates -- --nocapture
+	cargo test -p vigil-cli --test adversarial -- --nocapture
+	cargo test -p vigil-detect --test detection_quality -- --nocapture
+
+.PHONY: evidence
+evidence: ## Regenerate committed source-evidence counts
+	python3 scripts/generate_evidence.py
+
+.PHONY: evidence-check
+evidence-check: ## Verify committed source-evidence counts are current
+	python3 scripts/generate_evidence.py --check
+
+.PHONY: docs-check
+docs-check: ## Verify repository-local Markdown links
+	python3 scripts/check_docs.py
 
 .PHONY: simulate
 simulate: ## Persist a local blocked credential-read simulation
