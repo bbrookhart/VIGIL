@@ -13,6 +13,7 @@ let package = Package(
             linkerSettings: [
                 .linkedFramework("Network"),
                 .linkedFramework("NetworkExtension"),
+                .linkedFramework("Security"),
             ]
         ),
         .testTarget(

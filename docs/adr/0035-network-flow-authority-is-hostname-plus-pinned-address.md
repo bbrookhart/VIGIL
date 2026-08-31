@@ -50,9 +50,10 @@ exact domain-separated, instance-bound Ed25519 snapshot produced by Rust. Tests 
 allow, unknown host, port and protocol mismatch, direct IP, loopback, IPv4/IPv6, resolution and
 whole-policy expiry, modes, budgets, malformed/tampered snapshots, source failure, and rollback.
 
-This is still not an installed firewall. The protected out-of-band publisher, installable bundle,
-activation, byte budget, and flow telemetry persistence do not exist. The macOS SDK makes a filter
-control provider unavailable, so ADR 0036 defines distribution. Hostname metadata exposed by
+This is still not an installed firewall. The later protected publisher, bundle, and activation
+coordinator do not replace the remaining signed/entitled-device proof; byte budgets and flow
+telemetry persistence also do not exist. The macOS SDK makes a filter control provider unavailable,
+so ADR 0036 defines distribution. Hostname metadata exposed by
 Network Extension is not claimed to be authenticated application-layer SNI, and encrypted payload
 inspection is outside this decision contract.
 

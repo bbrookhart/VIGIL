@@ -12,6 +12,7 @@
 		A10000000000000000000003 /* VigilNetworkAdapter in Frameworks */ = {isa = PBXBuildFile; productRef = A90000000000000000000001 /* VigilNetworkAdapter */; };
 		A10000000000000000000004 /* VigilNetworkAdapter in Frameworks */ = {isa = PBXBuildFile; productRef = A90000000000000000000002 /* VigilNetworkAdapter */; };
 		A10000000000000000000005 /* com.vigil.security.network.systemextension in Embed System Extensions */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* com.vigil.security.network.systemextension */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		A10000000000000000000006 /* VigilMacSupport in Frameworks */ = {isa = PBXBuildFile; productRef = A90000000000000000000005 /* VigilMacSupport */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -56,6 +57,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000000000000000000003 /* VigilNetworkAdapter in Frameworks */,
+				A10000000000000000000006 /* VigilMacSupport in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -145,6 +147,7 @@
 			name = VigilHost;
 			packageProductDependencies = (
 				A90000000000000000000001 /* VigilNetworkAdapter */,
+				A90000000000000000000005 /* VigilMacSupport */,
 			);
 			productName = VIGIL;
 			productReference = A20000000000000000000009 /* VIGIL.app */;
@@ -193,6 +196,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				A90000000000000000000003 /* XCLocalSwiftPackageReference "network-filter" */,
+				A90000000000000000000004 /* XCLocalSwiftPackageReference "VigilMacSupport" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A30000000000000000000002 /* Products */;
@@ -338,11 +342,13 @@
 
 /* Begin XCLocalSwiftPackageReference section */
 		A90000000000000000000003 /* XCLocalSwiftPackageReference "network-filter" */ = {isa = XCLocalSwiftPackageReference; relativePath = "../../extensions/network-filter"; };
+		A90000000000000000000004 /* XCLocalSwiftPackageReference "VigilMacSupport" */ = {isa = XCLocalSwiftPackageReference; relativePath = "VigilMacSupport"; };
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		A90000000000000000000001 /* VigilNetworkAdapter */ = {isa = XCSwiftPackageProductDependency; package = A90000000000000000000003 /* XCLocalSwiftPackageReference "network-filter" */; productName = VigilNetworkAdapter; };
 		A90000000000000000000002 /* VigilNetworkAdapter */ = {isa = XCSwiftPackageProductDependency; package = A90000000000000000000003 /* XCLocalSwiftPackageReference "network-filter" */; productName = VigilNetworkAdapter; };
+		A90000000000000000000005 /* VigilMacSupport */ = {isa = XCSwiftPackageProductDependency; package = A90000000000000000000004 /* XCLocalSwiftPackageReference "VigilMacSupport" */; productName = VigilMacSupport; };
 /* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A70000000000000000000001 /* Project object */;

@@ -27,6 +27,19 @@ IPC. The containing-app configuration factory and provider startup parser share 
 and trusted public keys. The provider's group access is read-only and startup refuses a missing,
 unstable, or mismatched envelope/replay-record pair.
 
+Provider-health signing uses a separate Ed25519 identity in the Network System Extension's default
+Keychain access group. The item is device-only, non-synchronizing, insert-only, and is loaded only
+during provider lifecycle work. Neither entitlement plist requests a shared Keychain access group,
+and private health-key bytes never enter the App Group. The provider publishes only an untrusted
+public enrollment record. After OS-confirmed activation, the containing app requires that candidate
+to authenticate fresh bound health before it inserts an immutable pin in its own default Keychain
+namespace. The host's own device-only Keychain stores the durable installation UUID and immutable
+public-key pin; neither is shared with the provider. The app composes and polls this enrollment
+path. A separate host-only Keychain identity signs the zero-authority bootstrap policy; only its
+public key enters the strict provider preference configuration. The explicit UI workflow publishes
+policy before saving/reloading exact filter preferences. Conditional containing-app renewal and
+provider-side verified reload are implemented; provisioned-device validation remains.
+
 The SDK also exposes public `SecCodeCreateWithXPCMessage`, which derives a dynamic code object from
 the audit token attached to an XPC message, and `SecCodeCheckValidity`, which evaluates the daemon's
 configured signing requirement. The adapter compiles this peer-verification path and rejects a
@@ -41,9 +54,10 @@ must never fake entitlement success or extension activation.
 
 This machine now has Xcode 26.6 and can build and test the native Swift packages. The repository's
 reviewable Xcode project also builds an unsigned SwiftUI containing app with the Network System
-Extension embedded at `Contents/Library/SystemExtensions`. It has no valid code-signing identity,
-approved security entitlement, or provisioning profile. Activation, signing, and entitled
-behavior therefore cannot be tested here yet.
+Extension embedded at `Contents/Library/SystemExtensions`. The app compiles the public activation,
+inspection, replacement, and deactivation lifecycle and fails closed on downgrade. It has no valid
+code-signing identity, approved security entitlement, or provisioning profile. Successful
+activation and entitled behavior therefore cannot be tested here yet.
 
 `APPLE_APPLICATION_PACK.md` holds the enrolment decision and drafted request
 justifications; `UNBLOCKING.md` records the dependency order for obtaining these, and the disposable-VM
