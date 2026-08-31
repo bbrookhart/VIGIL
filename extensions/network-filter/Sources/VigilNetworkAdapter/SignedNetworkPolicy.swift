@@ -75,8 +75,8 @@ public struct NativeSignedNetworkPolicyVerifier: Sendable {
         }
         guard encodedPayload.utf8.count <= encodedLengthBound(maximumPayloadBytes),
               encodedSignature.utf8.count <= encodedLengthBound(64),
-              let payload = decodeBase64URL(encodedPayload), payload.count <= maximumPayloadBytes,
-              let signature = decodeBase64URL(encodedSignature), signature.count == 64
+              let payload = decodeNetworkBase64URL(encodedPayload), payload.count <= maximumPayloadBytes,
+              let signature = decodeNetworkBase64URL(encodedSignature), signature.count == 64
         else {
             throw NativeSignedNetworkPolicyError.invalidEncoding
         }
@@ -161,7 +161,7 @@ private func strictObject(_ data: Data, keys: Set<String>) -> [String: Any]? {
     return object
 }
 
-private func decodeBase64URL(_ value: String) -> Data? {
+func decodeNetworkBase64URL(_ value: String) -> Data? {
     guard !value.isEmpty,
           value.utf8.allSatisfy({ asciiAlphaNumeric($0) || $0 == 45 || $0 == 95 }),
           value.utf8.count % 4 != 1
@@ -169,13 +169,13 @@ private func decodeBase64URL(_ value: String) -> Data? {
     var standard = value.replacingOccurrences(of: "-", with: "+")
         .replacingOccurrences(of: "_", with: "/")
     standard.append(String(repeating: "=", count: (4 - standard.utf8.count % 4) % 4))
-    guard let decoded = Data(base64Encoded: standard), encodeBase64URL(decoded) == value else {
+    guard let decoded = Data(base64Encoded: standard), encodeNetworkBase64URL(decoded) == value else {
         return nil
     }
     return decoded
 }
 
-private func encodeBase64URL(_ data: Data) -> String {
+func encodeNetworkBase64URL(_ data: Data) -> String {
     data.base64EncodedString()
         .replacingOccurrences(of: "+", with: "-")
         .replacingOccurrences(of: "/", with: "_")

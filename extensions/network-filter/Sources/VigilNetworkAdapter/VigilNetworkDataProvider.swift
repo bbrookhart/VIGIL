@@ -10,15 +10,51 @@ import NetworkExtension
 /// performs file, DNS, database, XPC, UI, or logging work.
 public final class VigilNetworkDataProvider: NEFilterDataProvider {
     private let policyState: NativeNetworkPolicyState
+    private let lifecycle: NativeNetworkProviderLifecycle
 
     public override init() {
-        policyState = NativeNetworkPolicyState()
+        let state = NativeNetworkPolicyState()
+        policyState = state
+        lifecycle = NativeNetworkProviderLifecycle(state: state)
         super.init()
     }
 
     public init(policyState: NativeNetworkPolicyState) {
         self.policyState = policyState
+        lifecycle = NativeNetworkProviderLifecycle(state: policyState)
         super.init()
+    }
+
+    public override func startFilter(completionHandler: @escaping (Error?) -> Void) {
+        let now = currentUnixMilliseconds()
+        guard let now else {
+            completionHandler(startupError(.policyUnavailable))
+            return
+        }
+        do {
+            _ = try lifecycle.start(
+                vendorConfiguration: filterConfiguration.vendorConfiguration ?? [:],
+                nowUnixMilliseconds: now,
+                containerResolver: {
+                    FileManager.default.containerURL(
+                        forSecurityApplicationGroupIdentifier: $0
+                    )
+                }
+            )
+            completionHandler(nil)
+        } catch let error as NativeNetworkProviderLifecycleError {
+            completionHandler(startupError(error))
+        } catch {
+            completionHandler(startupError(.policyUnavailable))
+        }
+    }
+
+    public override func stopFilter(
+        with reason: NEProviderStopReason, completionHandler: @escaping () -> Void
+    ) {
+        _ = reason
+        lifecycle.stop()
+        completionHandler()
     }
 
     public func installVerifiedPolicy(_ snapshot: VerifiedNativeNetworkSnapshot) throws {
@@ -79,6 +115,14 @@ public final class VigilNetworkDataProvider: NEFilterDataProvider {
         let now = Date().timeIntervalSince1970 * 1_000
         guard now.isFinite, now >= 0, now <= Double(Int64.max) else { return nil }
         return Int64(now)
+    }
+
+    private func startupError(_ error: NativeNetworkProviderLifecycleError) -> NSError {
+        NSError(
+            domain: "com.vigil.security.network.provider",
+            code: error.rawValue,
+            userInfo: [NSLocalizedDescriptionKey: "VIGIL network policy is unavailable"]
+        )
     }
 
     private func protocolForSocket(_ flow: NEFilterSocketFlow) -> NativeNetworkProtocol? {

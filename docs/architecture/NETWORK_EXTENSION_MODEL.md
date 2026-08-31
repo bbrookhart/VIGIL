@@ -1,6 +1,6 @@
 # Network Extension model
 
-**Status:** native data-provider boundary compiles; no installable or activated extension  
+**Status:** unsigned containing-app/System Extension graph builds; no signed or activated extension
 **Deployment floor:** macOS 15 for the public `remoteFlowEndpoint` API
 
 VIGIL constrains network flows only for processes attributed to a managed session. Unattributed
@@ -12,16 +12,16 @@ host traffic remains unaffected, including when VIGIL policy is missing or unhea
 Rust policy compiler/signing key
         │ strict, instance-bound Ed25519 envelope
         ▼
-protected out-of-band publisher                 [not built]
+protected atomic envelope publisher             [built; provisioning pending]
         │ atomic shared-container/configuration update
         ▼
-Swift verifier + monotonic in-memory state      [built and checked]
+read-only Swift startup verifier + state         [built and checked]
         │ no callback I/O
         ▼
-NEFilterDataProvider.handleNewFlow              [public subclass compiles]
+NEFilterDataProvider.handleNewFlow              [embedded in unsigned SYSX]
         │ allow / drop / pause
         ▼
-macOS flow                                      [not installed or activated]
+macOS flow                                      [not signed, installed, or activated]
 ```
 
 The fast-path identity is:
@@ -53,10 +53,22 @@ check and regenerated/freshness-checked in CI.
 
 The public macOS SDK marks `NEFilterControlProvider`, `needRulesVerdict`, and
 `notifyRulesChanged` unavailable on macOS. Consequently VIGIL does not model a control provider.
-The future containing application or daemon must publish the envelope out of band through an
-Apple-supported protected shared-container or configuration mechanism. The data callback consumes
-only verified in-memory state and performs no DNS, network, filesystem, database, IPC, UI, model,
-or logging work. See ADR 0036.
+The containing application or daemon verifies and publishes exact envelope bytes out of band
+through the atomic shared-container store, then commits the matching durable `(generation,
+envelope digest)` replay record. One cross-process lock covers that complete write transaction.
+The provider's App Group view is read-only: `startFilter` parses an exact vendor-configuration
+schema, resolves the group, double-reads the durable record around the envelope read, verifies the
+signature and exact generation/digest match, and only then activates policy. A restart may restore
+only the exact envelope at the durable generation; different bytes at the same generation are
+equivocation. The data callback consumes only verified in-memory state and performs no DNS,
+network, filesystem, database, IPC, UI, model, or logging work. See ADRs 0036 and 0043.
+
+The containing-app preference controller uses public `NEFilterManager` load/save/remove APIs. It
+serializes complete operations, bounds every OS call, and reloads to verify exact provider bundle,
+App Group, instance, key set, socket/packet flags, firewall grade, description, and enabled state.
+Configuration drift is distinct from enabled VIGIL preferences. A timeout invalidates the
+controller because the mutation's outcome is unknown. Even an exact enabled preference is not
+reported as active enforcement; see ADR 0044.
 
 ## What the simulator and native check prove
 
@@ -69,10 +81,8 @@ provider subclass so SDK drift fails compilation.
 
 ## Remaining Phase 4 work
 
-- protected atomic shared-container/configuration publisher and reader;
-- durable generation high-water state across extension restarts;
-- installable Xcode System Extension target and containing-app configuration;
-- activation, upgrade, rollback, signing, notarization, and entitlement provisioning;
+- provision the factory's exact configuration, trusted keys, and App Group in signed targets;
+- System Extension activation, upgrade, rollback, signing, notarization, and entitlement provisioning;
 - flow telemetry persistence and supported prompt resumption/cancellation;
 - byte-budget accounting at a layer with trustworthy byte visibility;
 - entitled-device tests proving allowlisted reachability and denied-destination prevention.

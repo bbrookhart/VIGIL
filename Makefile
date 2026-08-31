@@ -43,6 +43,18 @@ test-macos-network-adapter: ## Run the native Network Extension adapter test sui
 	SWIFT_MODULE_CACHE_PATH=/tmp/vigil-network-swift-modules \
 	swift test --disable-sandbox --package-path extensions/network-filter
 
+.PHONY: build-macos-app
+build-macos-app: ## Build and inspect the unsigned macOS app/System Extension graph
+	xcodebuild -project platform/macos/VigilMac.xcodeproj \
+		-scheme VigilMac -configuration Debug -destination 'platform=macOS' \
+		-derivedDataPath /tmp/vigil-xcode-derived \
+		-packageCachePath /tmp/vigil-xcode-packages \
+		-quiet CODE_SIGNING_ALLOWED=NO build
+	test -x /tmp/vigil-xcode-derived/Build/Products/Debug/VIGIL.app/Contents/MacOS/VIGIL
+	test -x /tmp/vigil-xcode-derived/Build/Products/Debug/VIGIL.app/Contents/Library/SystemExtensions/com.vigil.security.network.systemextension/Contents/MacOS/com.vigil.security.network
+	plutil -lint /tmp/vigil-xcode-derived/Build/Products/Debug/VIGIL.app/Contents/Info.plist
+	plutil -lint /tmp/vigil-xcode-derived/Build/Products/Debug/VIGIL.app/Contents/Library/SystemExtensions/com.vigil.security.network.systemextension/Contents/Info.plist
+
 .PHONY: test-e2e
 test-e2e: ## Run only the end-to-end gate tests (Gate 1/2, Demos 1-3)
 	cargo test -p vigil-core --test end_to_end -- --nocapture
@@ -60,8 +72,8 @@ verify: fmt-check lint test ## Everything CI runs
 	@echo "✓ all gates passed"
 
 .PHONY: verify-macos
-verify-macos: verify test-macos-adapter test-macos-network-adapter ## Portable gates plus native macOS adapters
-	@echo "✓ all portable and macOS adapter gates passed"
+verify-macos: verify test-macos-adapter test-macos-network-adapter build-macos-app ## Portable gates plus native macOS products
+	@echo "✓ all portable and macOS product gates passed"
 
 .PHONY: fmt
 fmt: ## Format Rust sources

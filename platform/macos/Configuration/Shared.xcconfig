@@ -1,0 +1,12 @@
+// Shared, non-secret build settings. Production signing values remain external.
+#include "../../../extensions/endpoint-security/Configuration/VigilIdentifiers.xcconfig"
+
+MACOSX_DEPLOYMENT_TARGET = 15.0
+MARKETING_VERSION = 0.1.0
+CURRENT_PROJECT_VERSION = 1
+SWIFT_VERSION = 6.0
+ENABLE_HARDENED_RUNTIME = YES
+CLANG_ENABLE_MODULES = YES
+CLANG_ENABLE_OBJC_ARC = YES
+CODE_SIGN_STYLE = Manual
+DEVELOPMENT_TEAM =

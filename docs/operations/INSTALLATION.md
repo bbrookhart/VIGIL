@@ -20,17 +20,17 @@ created owner-only, with preimage blobs beside it.
 
 ## What you cannot install today, and why
 
-**There is no installable macOS enforcement.** No activatable System Extension bundle, no installed
-Network Extension,
-no `vigild`, no signed installer, no notarized package. This is not a packaging gap that a
-Makefile target would close; it is blocked on things Apple issues:
+**There is no installable macOS enforcement.** A reviewable unsigned app/System Extension build
+exists, but there is no activatable signed System Extension, installed Network Extension,
+no `vigild`, no signed installer, no notarized package. The bundle targets still need real
+provisioning and review on an entitled device; activation remains blocked on things Apple issues:
 
 | Requirement | Status |
 |---|---|
 | `com.apple.developer.endpoint-security.client` entitlement | **Not held.** Requires Apple approval of a business justification. |
 | Network Extension entitlement | **Not held.** |
 | Apple Developer Team ID and Developer ID certificate | **Not held.** No signing identity on the build machine. |
-| Full Xcode | **Not installed.** This machine has Command Line Tools, so there is no `xcodebuild`, no `.app` or `.systemextension` bundle, and no XCTest target. |
+| Full Xcode | **Installed:** Xcode 26.6. The unsigned application/System Extension graph builds. |
 | Notarization | Requires the above. |
 
 `docs/development/APPLE_ENTITLEMENTS.md` has the detail. The repository contains entitlement
@@ -38,13 +38,13 @@ Makefile target would close; it is blocked on things Apple issues:
 nothing here fakes entitlement success.
 
 The repository does contain compile-checked public Endpoint Security and Network Extension Swift
-adapters. The latter includes a real `NEFilterDataProvider`, strict signed-policy verifier, and
-future target configuration templates. Swift packages and plist templates are not `.app` or
-`.systemextension` products and cannot be activated.
+adapters. The latter includes a real `NEFilterDataProvider`, strict signed-policy verifier,
+protected publisher/reader, provider startup lifecycle, and a bounded containing-app
+`NEFilterManager` preference controller. `make build-macos-app` produces an unsigned `.app` with
+the `.systemextension` embedded at the standard bundle location. It cannot be activated.
 
-An unsigned System Extension cannot be activated by macOS at all, so hand-rolling a bundle would
-produce something that looks installable and is not. That is the reason it does not exist rather
-than existing in a broken state.
+The unsigned product is deliberately a compile/review artifact, not an installer. VIGIL will not
+present it as protection until signing, activation, OS approval, and entitled-device tests agree.
 
 ## When the entitled half exists
 

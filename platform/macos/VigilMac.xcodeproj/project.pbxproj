@@ -1,0 +1,349 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10000000000000000000001 /* VigilHostApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* VigilHostApp.swift */; };
+		A10000000000000000000002 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* main.swift */; };
+		A10000000000000000000003 /* VigilNetworkAdapter in Frameworks */ = {isa = PBXBuildFile; productRef = A90000000000000000000001 /* VigilNetworkAdapter */; };
+		A10000000000000000000004 /* VigilNetworkAdapter in Frameworks */ = {isa = PBXBuildFile; productRef = A90000000000000000000002 /* VigilNetworkAdapter */; };
+		A10000000000000000000005 /* com.vigil.security.network.systemextension in Embed System Extensions */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* com.vigil.security.network.systemextension */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A80000000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A70000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A60000000000000000000002;
+			remoteInfo = VigilNetworkSystemExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		A50000000000000000000004 /* Embed System Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(SYSTEM_EXTENSIONS_FOLDER_PATH)";
+			dstSubfolderSpec = 16;
+			files = (
+				A10000000000000000000005 /* com.vigil.security.network.systemextension in Embed System Extensions */,
+			);
+			name = "Embed System Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		A20000000000000000000001 /* VigilHostApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VigilHostApp.swift; sourceTree = "<group>"; };
+		A20000000000000000000002 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		A20000000000000000000003 /* VigilHost-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "VigilHost-Info.plist"; sourceTree = "<group>"; };
+		A20000000000000000000004 /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
+		A20000000000000000000005 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "NetworkSystemExtension-Info.plist"; path = "../../../extensions/network-filter/Configuration/Info.plist"; sourceTree = "<group>"; };
+		A20000000000000000000006 /* VigilNetworkHost.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = VigilNetworkHost.entitlements; path = "../../../extensions/network-filter/Configuration/VigilNetworkHost.entitlements"; sourceTree = "<group>"; };
+		A20000000000000000000007 /* VigilNetwork.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = VigilNetwork.entitlements; path = "../../../extensions/network-filter/Configuration/VigilNetwork.entitlements"; sourceTree = "<group>"; };
+		A20000000000000000000008 /* com.vigil.security.network.systemextension */ = {isa = PBXFileReference; explicitFileType = "wrapper.system-extension"; includeInIndex = 0; path = "com.vigil.security.network.systemextension"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000000000000000000009 /* VIGIL.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VIGIL.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A50000000000000000000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000003 /* VigilNetworkAdapter in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A50000000000000000000006 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000004 /* VigilNetworkAdapter in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A30000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				A30000000000000000000003 /* Sources */,
+				A30000000000000000000004 /* Configuration */,
+				A30000000000000000000002 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A30000000000000000000002 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000009 /* VIGIL.app */,
+				A20000000000000000000008 /* com.vigil.security.network.systemextension */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A30000000000000000000003 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				A30000000000000000000005 /* VigilHost */,
+				A30000000000000000000006 /* VigilNetworkSystemExtension */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		A30000000000000000000004 /* Configuration */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000004 /* Shared.xcconfig */,
+				A20000000000000000000003 /* VigilHost-Info.plist */,
+				A20000000000000000000005 /* NetworkSystemExtension-Info.plist */,
+				A20000000000000000000006 /* VigilNetworkHost.entitlements */,
+				A20000000000000000000007 /* VigilNetwork.entitlements */,
+			);
+			path = Configuration;
+			sourceTree = "<group>";
+		};
+		A30000000000000000000005 /* VigilHost */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000001 /* VigilHostApp.swift */,
+			);
+			path = VigilHost;
+			sourceTree = "<group>";
+		};
+		A30000000000000000000006 /* VigilNetworkSystemExtension */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000002 /* main.swift */,
+			);
+			path = VigilNetworkSystemExtension;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A60000000000000000000001 /* VigilHost */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A40000000000000000000002 /* Build configuration list for PBXNativeTarget "VigilHost" */;
+			buildPhases = (
+				A50000000000000000000001 /* Sources */,
+				A50000000000000000000002 /* Frameworks */,
+				A50000000000000000000003 /* Resources */,
+				A50000000000000000000004 /* Embed System Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A80000000000000000000002 /* PBXTargetDependency */,
+			);
+			name = VigilHost;
+			packageProductDependencies = (
+				A90000000000000000000001 /* VigilNetworkAdapter */,
+			);
+			productName = VIGIL;
+			productReference = A20000000000000000000009 /* VIGIL.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A60000000000000000000002 /* VigilNetworkSystemExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A40000000000000000000003 /* Build configuration list for PBXNativeTarget "VigilNetworkSystemExtension" */;
+			buildPhases = (
+				A50000000000000000000005 /* Sources */,
+				A50000000000000000000006 /* Frameworks */,
+				A50000000000000000000007 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = VigilNetworkSystemExtension;
+			packageProductDependencies = (
+				A90000000000000000000002 /* VigilNetworkAdapter */,
+			);
+			productName = "com.vigil.security.network";
+			productReference = A20000000000000000000008 /* com.vigil.security.network.systemextension */;
+			productType = "com.apple.product-type.system-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A70000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2660;
+				LastUpgradeCheck = 2660;
+				TargetAttributes = {
+					A60000000000000000000001 = {CreatedOnToolsVersion = 26.6; };
+					A60000000000000000000002 = {CreatedOnToolsVersion = 26.6; };
+				};
+			};
+			buildConfigurationList = A40000000000000000000001 /* Build configuration list for PBXProject "VigilMac" */;
+			compatibilityVersion = "Xcode 16.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (en, Base, );
+			mainGroup = A30000000000000000000001;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				A90000000000000000000003 /* XCLocalSwiftPackageReference "network-filter" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = A30000000000000000000002 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A60000000000000000000001 /* VigilHost */,
+				A60000000000000000000002 /* VigilNetworkSystemExtension */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A50000000000000000000003 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		A50000000000000000000007 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A50000000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (A10000000000000000000001 /* VigilHostApp.swift in Sources */, );
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A50000000000000000000005 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (A10000000000000000000002 /* main.swift in Sources */, );
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A80000000000000000000002 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = A60000000000000000000002 /* VigilNetworkSystemExtension */; targetProxy = A80000000000000000000001 /* PBXContainerItemProxy */; };
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		A40000000000000000000011 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A20000000000000000000004 /* Shared.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				ONLY_ACTIVE_ARCH = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		A40000000000000000000012 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A20000000000000000000004 /* Shared.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		A40000000000000000000021 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A20000000000000000000004 /* Shared.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = "../../extensions/network-filter/Configuration/VigilNetworkHost.entitlements";
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_APP_SANDBOX = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Configuration/VigilHost-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = "$(VIGIL_CONTROL_CENTER_BUNDLE_IDENTIFIER)";
+				PRODUCT_NAME = VIGIL;
+				REGISTER_APP_GROUPS = YES;
+			};
+			name = Debug;
+		};
+		A40000000000000000000022 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A20000000000000000000004 /* Shared.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = "../../extensions/network-filter/Configuration/VigilNetworkHost.entitlements";
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_APP_SANDBOX = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Configuration/VigilHost-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = "$(VIGIL_CONTROL_CENTER_BUNDLE_IDENTIFIER)";
+				PRODUCT_NAME = VIGIL;
+				REGISTER_APP_GROUPS = YES;
+			};
+			name = Release;
+		};
+		A40000000000000000000031 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A20000000000000000000004 /* Shared.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = "../../extensions/network-filter/Configuration/VigilNetwork.entitlements";
+				ENABLE_APP_SANDBOX = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "../../extensions/network-filter/Configuration/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @executable_path/../../../../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = "$(VIGIL_NETWORK_EXTENSION_BUNDLE_IDENTIFIER)";
+				PRODUCT_MODULE_NAME = VigilNetworkSystemExtension;
+				PRODUCT_NAME = "$(VIGIL_NETWORK_EXTENSION_BUNDLE_IDENTIFIER)";
+				REGISTER_APP_GROUPS = YES;
+				SKIP_INSTALL = YES;
+		};
+			name = Debug;
+		};
+		A40000000000000000000032 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A20000000000000000000004 /* Shared.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = "../../extensions/network-filter/Configuration/VigilNetwork.entitlements";
+				ENABLE_APP_SANDBOX = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "../../extensions/network-filter/Configuration/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @executable_path/../../../../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = "$(VIGIL_NETWORK_EXTENSION_BUNDLE_IDENTIFIER)";
+				PRODUCT_MODULE_NAME = VigilNetworkSystemExtension;
+				PRODUCT_NAME = "$(VIGIL_NETWORK_EXTENSION_BUNDLE_IDENTIFIER)";
+				REGISTER_APP_GROUPS = YES;
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A40000000000000000000001 /* Build configuration list for PBXProject "VigilMac" */ = {isa = XCConfigurationList; buildConfigurations = (A40000000000000000000011 /* Debug */, A40000000000000000000012 /* Release */, ); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		A40000000000000000000002 /* Build configuration list for PBXNativeTarget "VigilHost" */ = {isa = XCConfigurationList; buildConfigurations = (A40000000000000000000021 /* Debug */, A40000000000000000000022 /* Release */, ); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		A40000000000000000000003 /* Build configuration list for PBXNativeTarget "VigilNetworkSystemExtension" */ = {isa = XCConfigurationList; buildConfigurations = (A40000000000000000000031 /* Debug */, A40000000000000000000032 /* Release */, ); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		A90000000000000000000003 /* XCLocalSwiftPackageReference "network-filter" */ = {isa = XCLocalSwiftPackageReference; relativePath = "../../extensions/network-filter"; };
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A90000000000000000000001 /* VigilNetworkAdapter */ = {isa = XCSwiftPackageProductDependency; package = A90000000000000000000003 /* XCLocalSwiftPackageReference "network-filter" */; productName = VigilNetworkAdapter; };
+		A90000000000000000000002 /* VigilNetworkAdapter */ = {isa = XCSwiftPackageProductDependency; package = A90000000000000000000003 /* XCLocalSwiftPackageReference "network-filter" */; productName = VigilNetworkAdapter; };
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = A70000000000000000000001 /* Project object */;
+}

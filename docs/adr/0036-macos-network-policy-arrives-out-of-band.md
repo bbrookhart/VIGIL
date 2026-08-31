@@ -29,8 +29,10 @@ Unattributed host processes remain unaffected.
 ## Consequences
 
 The Rust signer and Swift verifier share a generated fixture and CI parity gate. The public data
-provider compiles and the package includes entitlement/Info.plist templates, but the protected
-publisher, atomic shared-container file or configuration transport, durable generation high-water
-mark, installable Xcode target, signing, activation, and entitled-device tests remain required.
+provider, protected publisher/reader, strict App Group startup lifecycle, and containing-app
+configuration factory compile, and the package includes entitlement/Info.plist templates.
+Provisioning these in an installable Xcode target, signing, activation, and entitled-device tests
+remain required. The atomic shared-container transport and durable
+generation-plus-envelope-digest replay floor are implemented by ADR 0043.
 
 No Network Extension callback waits for IPC, performs DNS, or trusts an agent-provided PID.

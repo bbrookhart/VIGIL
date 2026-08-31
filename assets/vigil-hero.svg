@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 480" role="img" aria-labelledby="title desc">
+  <title id="title">VIGIL — Runtime security for autonomous AI agents</title>
+  <desc id="desc">A dark technical banner showing untrusted agent intent crossing VIGIL's policy boundary. Verified capability proceeds to the real world while denied authority is stopped and recorded.</desc>
+
+  <defs>
+    <linearGradient id="vigil-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#050A10"/>
+      <stop offset="0.52" stop-color="#09141E"/>
+      <stop offset="1" stop-color="#0B1B24"/>
+    </linearGradient>
+    <linearGradient id="vigil-signal" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#5B8CFF"/>
+      <stop offset="0.48" stop-color="#66D9C4"/>
+      <stop offset="1" stop-color="#A5F3D3"/>
+    </linearGradient>
+    <linearGradient id="vigil-shield" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7AA2FF"/>
+      <stop offset="0.55" stop-color="#60D8C2"/>
+      <stop offset="1" stop-color="#B5F5D9"/>
+    </linearGradient>
+    <radialGradient id="vigil-halo">
+      <stop offset="0" stop-color="#4ED4BF" stop-opacity="0.20"/>
+      <stop offset="0.52" stop-color="#4C8DFF" stop-opacity="0.09"/>
+      <stop offset="1" stop-color="#061019" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="vigil-grid" width="36" height="36" patternUnits="userSpaceOnUse">
+      <path d="M36 0H0V36" fill="none" stroke="#254051" stroke-width="1" opacity="0.33"/>
+    </pattern>
+    <pattern id="vigil-microgrid" width="9" height="9" patternUnits="userSpaceOnUse">
+      <path d="M9 0H0V9" fill="none" stroke="#325064" stroke-width="0.5" opacity="0.18"/>
+    </pattern>
+    <filter id="vigil-glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="vigil-soft-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Self-contained ground for consistent GitHub light/dark rendering. -->
+  <rect width="1440" height="480" rx="22" fill="url(#vigil-bg)"/>
+  <rect width="1440" height="480" rx="22" fill="url(#vigil-grid)"/>
+  <rect x="0.75" y="0.75" width="1438.5" height="478.5" rx="21.25" fill="none" stroke="#233949" stroke-width="1.5"/>
+
+  <!-- Registration marks and quiet telemetry traces. -->
+  <g stroke="#49677A" stroke-width="1.4" fill="none" opacity="0.72">
+    <path d="M30 22V48M22 30H48M1410 22V48M1418 30H1392"/>
+    <path d="M30 458V432M22 450H48M1410 458V432M1418 450H1392"/>
+  </g>
+  <g fill="none" stroke="#386176" stroke-width="1.25" opacity="0.23">
+    <path d="M0 394C145 360 235 418 366 390S615 350 748 387 984 420 1114 384 1324 355 1440 374"/>
+    <path d="M0 410C160 385 255 438 392 409S621 374 770 406 1017 435 1141 404 1332 382 1440 396"/>
+  </g>
+
+  <!-- Wordmark and product statement. -->
+  <g transform="translate(82 74)">
+    <text x="0" y="0" fill="#66D9C4"
+          font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+          font-size="15" font-weight="700" letter-spacing="5.2">LOCAL AGENT SECURITY CONTROL PLANE</text>
+    <text x="0" y="113" fill="#F2F7FA"
+          font-family="Inter, Helvetica Neue, Arial, sans-serif"
+          font-size="104" font-weight="800" letter-spacing="25">VIGIL</text>
+    <rect x="3" y="137" width="600" height="3" rx="1.5" fill="url(#vigil-signal)"/>
+    <text x="0" y="195" fill="#C6D3DC"
+          font-family="Inter, Helvetica Neue, Arial, sans-serif"
+          font-size="27" font-weight="500">Runtime security for autonomous AI agents.</text>
+    <text x="0" y="238" fill="#8197A7"
+          font-family="Inter, Helvetica Neue, Arial, sans-serif"
+          font-size="19">Bound intent. Verify authority. Stop the action before it executes.</text>
+  </g>
+
+  <!-- Decision boundary emblem: untrusted intent enters; verified capability exits. -->
+  <g transform="translate(1128 198)">
+    <circle r="174" fill="url(#vigil-halo)"/>
+    <circle r="136" fill="#09131D" stroke="#315064" stroke-width="1.5"/>
+    <circle r="116" fill="url(#vigil-microgrid)" stroke="#4E7184" stroke-opacity="0.55"/>
+
+    <g filter="url(#vigil-glow)">
+      <path d="M0-83 76-51 65 39Q53 92 0 119-53 92-65 39L-76-51Z"
+            fill="#07121A" stroke="url(#vigil-shield)" stroke-width="4"/>
+      <!-- The open diamond is VIGIL's decision aperture, not a decorative shield glyph. -->
+      <path d="M0-39 41 0 0 53-41 0Z" fill="none" stroke="#E5FFF6" stroke-width="5"/>
+      <path d="M-22 0-4 19 31-21" fill="none" stroke="#66D9C4" stroke-width="6"
+            stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+
+    <g fill="none" stroke-width="2.2" stroke-linecap="round">
+      <path d="M-191 0H-83" stroke="#6D8DFF" stroke-dasharray="4 9"/>
+      <path d="M83 0H191" stroke="#66D9C4"/>
+      <path d="M-150 20H-83" stroke="#FF6F6F" stroke-opacity="0.8" stroke-dasharray="3 8"/>
+    </g>
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+       font-size="10.5" font-weight="700" letter-spacing="2.2">
+      <text x="-190" y="-15" fill="#91A6FF">INTENT</text>
+      <text x="100" y="-15" fill="#8CE8D4">CAPABILITY</text>
+      <text x="-189" y="39" fill="#FF8585">DENY</text>
+    </g>
+  </g>
+
+  <!-- The compact system thesis, consistent with the portfolio's causal chains. -->
+  <g transform="translate(82 407)" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+     font-size="11.5" font-weight="700" letter-spacing="2.2">
+    <g fill="#A9BAC6">
+      <text x="0" y="6">IDENTITY</text>
+      <text x="160" y="6">INTENT</text>
+      <text x="300" y="6">POLICY</text>
+      <text x="440" y="6">BUDGET</text>
+      <text x="584" y="6">CAPABILITY</text>
+      <text x="772" y="6">ENFORCE</text>
+      <text x="936" y="6">EVIDENCE</text>
+    </g>
+    <g stroke="#426172" stroke-width="1.4">
+      <path d="M92 2h50M232 2h50M373 2h49M515 2h51M697 2h57M858 2h60"/>
+    </g>
+    <g fill="#0A141D" stroke="url(#vigil-signal)" stroke-width="1.5" filter="url(#vigil-soft-glow)">
+      <circle cx="1006" cy="2" r="5"/>
+    </g>
+  </g>
+
+  <text x="1357" y="444" text-anchor="end" fill="#627A89"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+        font-size="11.5" letter-spacing="2">MVP // macOS · RUST · SWIFT</text>
+</svg>

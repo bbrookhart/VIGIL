@@ -34,14 +34,20 @@ attribution is still required to govern sockets opened outside this broker.
 The secret provider is untrusted as an evidence source. It receives only an exactly granted
 structured use, returns no secret bytes, and its error text is discarded before storage or caller
 output. Fixed metadata enums prevent provider-controlled descriptions from becoming a credential
-exfiltration channel. No native Keychain provider or authenticated cross-process broker exists in
-the current build.
+exfiltration channel. A Keychain-backed Git-use provider exists, but no authenticated
+cross-process broker exists in the current build.
 
 ## `vigild` to system/network extensions
 
 Messages require versioning, strict schemas, size bounds, timeouts, caller authentication, and
 operation-specific authorization. Extensions receive compact least-privilege state. They do not
 trust client-provided PID/session claims.
+
+The future containing app treats Network Extension preferences as an untrusted asynchronous OS
+boundary. It validates the exact provider identity and vendor configuration, loads before every
+mutation, reloads after it, serializes callers, and abandons an instance after a timeout with an
+unknown outcome. An enabled preference is configuration evidence, not proof of extension health
+or traffic enforcement.
 
 The Endpoint fast path keys process executions by the full audit token rather than PID, propagates
 attribution from fork notifications, and replaces the token after an allowed exec. Native root
