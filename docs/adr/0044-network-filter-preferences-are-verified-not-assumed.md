@@ -25,8 +25,8 @@ reported as outcome-unknown and permanently invalidates that controller instance
 cannot blindly retry a mutation whose result may arrive later.
 
 Preference status is deliberately named and scoped as preference status. It is not System
-Extension activation or enforcement health; only the future activation coordinator and an
-entitled-device health check may make those claims.
+Extension activation or enforcement health; the activation coordinator in ADR 0046 and an
+entitled-device health check remain separate evidence.
 
 ## Consequences
 

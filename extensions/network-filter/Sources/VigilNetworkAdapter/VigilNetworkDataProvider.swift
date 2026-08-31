@@ -11,17 +11,26 @@ import NetworkExtension
 public final class VigilNetworkDataProvider: NEFilterDataProvider {
     private let policyState: NativeNetworkPolicyState
     private let lifecycle: NativeNetworkProviderLifecycle
+    private let flowCounters: NativeNetworkProviderFlowCounters
+    private let healthLock = NSLock()
+    private var healthPublicationLoop: NativeNetworkProviderHealthPublicationLoop?
+    private var policyReloadLoop: NativeNetworkProviderPolicyReloadLoop?
 
     public override init() {
         let state = NativeNetworkPolicyState()
         policyState = state
         lifecycle = NativeNetworkProviderLifecycle(state: state)
+        flowCounters = NativeNetworkProviderFlowCounters()
         super.init()
     }
 
-    public init(policyState: NativeNetworkPolicyState) {
+    public init(
+        policyState: NativeNetworkPolicyState,
+        flowCounters: NativeNetworkProviderFlowCounters = NativeNetworkProviderFlowCounters()
+    ) {
         self.policyState = policyState
         lifecycle = NativeNetworkProviderLifecycle(state: policyState)
+        self.flowCounters = flowCounters
         super.init()
     }
 
@@ -32,8 +41,12 @@ public final class VigilNetworkDataProvider: NEFilterDataProvider {
             return
         }
         do {
+            let vendorConfiguration = filterConfiguration.vendorConfiguration ?? [:]
+            let configuration = try NativeNetworkProviderConfiguration(
+                vendorConfiguration: vendorConfiguration
+            )
             _ = try lifecycle.start(
-                vendorConfiguration: filterConfiguration.vendorConfiguration ?? [:],
+                vendorConfiguration: vendorConfiguration,
                 nowUnixMilliseconds: now,
                 containerResolver: {
                     FileManager.default.containerURL(
@@ -41,10 +54,45 @@ public final class VigilNetworkDataProvider: NEFilterDataProvider {
                     )
                 }
             )
+            guard let container = FileManager.default.containerURL(
+                forSecurityApplicationGroupIdentifier: configuration.appGroupIdentifier
+            ), let providerBundleIdentifier = Bundle.main.bundleIdentifier else {
+                throw NativeNetworkProviderLifecycleError.unavailableAppGroup
+            }
+            let identity = try NativeNetworkProviderHealthKeyStore(
+                service: "com.vigil.security.network.provider-health",
+                account: configuration.targetInstanceID
+            ).loadOrCreate()
+            try NativeNetworkProviderHealthEnrollmentStore(directoryURL: container).publish(
+                identity: identity,
+                targetInstanceID: configuration.targetInstanceID,
+                providerBundleIdentifier: providerBundleIdentifier
+            )
+            let loop = try NativeNetworkProviderHealthPublicationLoop(
+                targetInstanceID: configuration.targetInstanceID,
+                providerBundleIdentifier: providerBundleIdentifier,
+                policyState: policyState,
+                counters: flowCounters,
+                publisher: NativeNetworkProviderHealthPublisher(
+                    store: try NativeNetworkProviderHealthEnvelopeStore(directoryURL: container),
+                    signer: identity.signer
+                )
+            )
+            let reloadLoop = try NativeNetworkProviderPolicyReloadLoop(lifecycle: lifecycle)
+            healthLock.withLock {
+                healthPublicationLoop?.stop()
+                policyReloadLoop?.stop()
+                healthPublicationLoop = loop
+                policyReloadLoop = reloadLoop
+            }
+            reloadLoop.start()
+            loop.start()
             completionHandler(nil)
         } catch let error as NativeNetworkProviderLifecycleError {
+            lifecycle.stop()
             completionHandler(startupError(error))
         } catch {
+            lifecycle.stop()
             completionHandler(startupError(.policyUnavailable))
         }
     }
@@ -53,6 +101,14 @@ public final class VigilNetworkDataProvider: NEFilterDataProvider {
         with reason: NEProviderStopReason, completionHandler: @escaping () -> Void
     ) {
         _ = reason
+        let loops = healthLock.withLock {
+            let loops = (healthPublicationLoop, policyReloadLoop)
+            healthPublicationLoop = nil
+            policyReloadLoop = nil
+            return loops
+        }
+        loops.0?.stop()
+        loops.1?.stop()
         lifecycle.stop()
         completionHandler()
     }
@@ -65,11 +121,15 @@ public final class VigilNetworkDataProvider: NEFilterDataProvider {
         let token = processAuditToken(flow)
         let observedAt = currentUnixMilliseconds()
         guard let projected = project(flow: flow, processToken: token) else {
-            return verdict(for: policyState.decideIncomplete(
+            let decision = policyState.decideIncomplete(
                 process: token, observedAtUnixMilliseconds: observedAt
-            ))
+            )
+            flowCounters.record(decision)
+            return verdict(for: decision)
         }
-        return verdict(for: policyState.decide(projected))
+        let decision = policyState.decide(projected)
+        flowCounters.record(decision)
+        return verdict(for: decision)
     }
 
     private func verdict(for decision: NativeNetworkDecision) -> NEFilterNewFlowVerdict {

@@ -41,15 +41,23 @@ The repository does contain compile-checked public Endpoint Security and Network
 adapters. The latter includes a real `NEFilterDataProvider`, strict signed-policy verifier,
 protected publisher/reader, provider startup lifecycle, and a bounded containing-app
 `NEFilterManager` preference controller. `make build-macos-app` produces an unsigned `.app` with
-the `.systemextension` embedded at the standard bundle location. It cannot be activated.
+the `.systemextension` embedded at the standard bundle location. Its Control Center implements
+public activation, inspection, safe replacement, and deactivation requests, but the unsigned
+artifact cannot successfully activate on this machine.
+
+The health screen also combines activation, exact preferences, authenticated provider generation,
+and generation-matched allow/deny observations. Provider and flow evidence producers intentionally
+remain unavailable in the unsigned build, so it cannot display `FULLY ENFORCED` from configuration
+alone.
 
 The unsigned product is deliberately a compile/review artifact, not an installer. VIGIL will not
 present it as protection until signing, activation, OS approval, and entitled-device tests agree.
 
 ## When the entitled half exists
 
-The installation flow will be: a containing application requests activation of the System
-Extension, the user approves it in System Settings, Full Disk Access is granted, `vigild`
+The implemented installation flow starts when the containing application requests activation of
+the System Extension. The user must then approve it in System Settings, Full Disk Access must be
+granted, `vigild`
 registers its Mach service through launchd, and `vigil doctor` reports `FULLY ENFORCED` instead of
 `OBSERVE ONLY`.
 

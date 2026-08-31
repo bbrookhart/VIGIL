@@ -7,6 +7,7 @@ because the slowest one does not block the most valuable one.
 ```
 Full Xcode ─────────────────────────────────► Phase 5, XCTest, bundle targets
   installed: Xcode 26.6
+  app/SYSX graph + activation lifecycle built
 
 Developer Program ($99/yr) ─┬───────────────► signing, notarization  (Phase 9)
   same day as an individual; └── prerequisite ─► both entitlement requests
@@ -39,8 +40,8 @@ Either route requires interactive Apple ID sign-in.
 
 ## 1. What full Xcode unblocks, with no approvals
 
-- `.app` and `.systemextension` bundle targets. Still outstanding: producing them needs
-  `xcodebuild` (now available), but *activating* one needs a Developer ID signing identity, and
+- **Done** — `.app` and Network `.systemextension` bundle targets plus the containing-app
+  activation lifecycle build under `xcodebuild`. Successfully *activating* one needs a Developer ID signing identity, and
   `security find-identity -v -p codesigning` reports none. An Apple ID alone does not grant one —
   that is step 2.
 - ~~**XCTest targets.**~~ **Done** — both packages now run real XCTest suites (76 tests) instead

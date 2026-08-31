@@ -12,7 +12,7 @@ host traffic remains unaffected, including when VIGIL policy is missing or unhea
 Rust policy compiler/signing key
         │ strict, instance-bound Ed25519 envelope
         ▼
-protected atomic envelope publisher             [built; provisioning pending]
+protected atomic envelope publisher             [built; conditional renewal]
         │ atomic shared-container/configuration update
         ▼
 read-only Swift startup verifier + state         [built and checked]
@@ -70,6 +70,40 @@ Configuration drift is distinct from enabled VIGIL preferences. A timeout invali
 controller because the mutation's outcome is unknown. Even an exact enabled preference is not
 reported as active enforcement; see ADR 0044.
 
+The SwiftUI host uses a separate `SystemExtensions` lifecycle coordinator to inspect, activate,
+replace, and deactivate the embedded provider. It serializes requests, surfaces user-approval and
+reboot-required states, ignores stale callbacks, redacts OS failures into stable categories, and
+refuses identity mismatch, malformed versions, or downgrade replacement. An active extension is
+still labelled enforcement-unverified until preferences and provider health corroborate it; see
+ADR 0046.
+
+Product-level health is a four-way conjunction: confirmed extension activation, exact enabled
+filter preferences, fresh authenticated provider readiness with a live generation, and fresh
+entitled allow/deny flow observations naming that same generation. Missing evidence cannot become
+healthy; stale/future evidence, drift, expiry, mismatched generations, or an incorrect probe result
+is explicit. The current host verifies signed provider evidence but has no privileged flow-proof
+producer and therefore renders `OBSERVE ONLY` or `DEGRADED`, never `FULLY ENFORCED`; see ADR 0047.
+
+Provider readiness now has a dedicated short-lived, domain-separated Ed25519 attestation contract.
+It binds the installation instance, provider bundle, policy generation/expiry, observation time,
+and internally consistent allow/drop/pause counters. Verification precedes strict decoding and is
+the only public bridge into ready health evidence. Production signing-key custody and the bounded
+publisher/reader path remain; no signing occurs inside `handleNewFlow`. See ADR 0048.
+
+The attestation transport is also built: provider-side publication uses an owner-only temporary
+file, fsync, atomic rename, directory fsync, and cross-process advisory lock; containing-app reads
+are bounded, owner/mode checked, symlink-safe, and create no state. Bytes pass through signature
+verification before the verified wrapper is returned. The provider now holds its device-only key
+in its non-shared Keychain namespace and publishes from a bounded serial lifecycle timer. Flow
+callbacks only increment constant-space counters. The provider also publishes an untrusted public
+identity; after OS-confirmed activation, the host requires that candidate to verify fresh bound
+health before pinning it insert-only in the host Keychain. The host now owns a durable installation
+UUID and polls this path outside the UI thread. The explicit Configure Filter path now publishes a
+signed zero-authority bootstrap policy before saving and exactly verifying filter preferences. The
+host conditionally renews near-expiry bootstrap leases, and the running provider pulls, verifies,
+and atomically installs newer durable generations on a bounded serial timer outside flow callbacks.
+An unsigned app still cannot activate this path, and flow proof remains absent. See ADRs 0049–0054.
+
 ## What the simulator and native check prove
 
 The entitlement-free Rust source replays ordered flows and injected source failure. Tests cover
@@ -82,7 +116,9 @@ provider subclass so SDK drift fails compilation.
 ## Remaining Phase 4 work
 
 - provision the factory's exact configuration, trusted keys, and App Group in signed targets;
-- System Extension activation, upgrade, rollback, signing, notarization, and entitlement provisioning;
+- signed activation/upgrade/deactivation validation, notarization, and entitlement provisioning;
+- the real managed-session policy feed;
+- entitled allow/deny evidence producer;
 - flow telemetry persistence and supported prompt resumption/cancellation;
 - byte-budget accounting at a layer with trustworthy byte visibility;
 - entitled-device tests proving allowlisted reachability and denied-destination prevention.

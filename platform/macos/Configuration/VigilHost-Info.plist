@@ -30,5 +30,9 @@
 	<string>NSApplication</string>
 	<key>NSSystemExtensionUsageDescription</key>
 	<string>VIGIL installs a network content filter to constrain traffic from explicitly managed AI agent sessions.</string>
+    <key>VigilNetworkExtensionBundleIdentifier</key>
+    <string>$(VIGIL_NETWORK_EXTENSION_BUNDLE_IDENTIFIER)</string>
+    <key>VigilApplicationGroupIdentifier</key>
+    <string>$(VIGIL_APPLICATION_GROUP_IDENTIFIER)</string>
 </dict>
 </plist>

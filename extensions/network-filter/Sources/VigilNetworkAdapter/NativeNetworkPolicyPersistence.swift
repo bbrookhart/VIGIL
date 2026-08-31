@@ -10,6 +10,7 @@ public enum NativeNetworkPolicyPersistenceError: Error, Equatable {
     case invalidLocation
     case insecureDirectory
     case policyUnavailable
+    case healthUnavailable
     case corruptState
     case rollback(current: UInt64, proposed: UInt64)
     case generationEquivocation
@@ -357,7 +358,7 @@ public final class NativeNetworkPolicyCoordinator: @unchecked Sendable {
     }
 }
 
-private enum NativeSecureNetworkFiles {
+enum NativeSecureNetworkFiles {
     static func openDirectory(_ path: String) throws -> Int32 {
         let descriptor = open(path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
         guard descriptor >= 0 else {

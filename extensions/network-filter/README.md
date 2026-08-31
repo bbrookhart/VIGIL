@@ -55,3 +55,31 @@ Command Line Tools, so a CLT-only machine can `swift build` this package but not
 `Contents/Library/SystemExtensions`, and validates both products. This does not grant an
 entitlement, sign, install, or activate anything. Those steps still require a Developer ID
 provisioning profile with Network Extension capability, notarization, and privileged-device tests.
+The containing app's separately tested `VigilMacSupport` module implements public activation,
+inspection, downgrade-safe replacement, deactivation, approval, reboot, and failure state handling.
+
+`SignedNetworkProviderHealth.swift` defines a separate, short-lived Ed25519 attestation for
+provider readiness. It binds the installation, provider bundle, live policy generation, timestamp,
+and exact allow/drop/pause totals before verified evidence can enter the Control Center health
+model. The provider keeps its stable signing key in its non-shared, device-only Keychain namespace;
+the private bytes are never written to the App Group or exposed by the custody API.
+
+The paired health transport atomically publishes owner-only envelopes through a same-directory
+rename and reads them with strict directory/file ownership, mode, type, symlink, and 32 KiB bounds.
+The reader returns only verifier-produced health. Provider startup creates a bounded serial
+publication loop; verdict callbacks only update constant-space counters, and signing/file work
+occurs on the lifecycle queue. Entitled-device proof remains.
+
+Provider startup also atomically publishes its strict public enrollment identity. The host-side
+verifier treats that file as untrusted until its candidate key authenticates a fresh, correctly
+bound health envelope. Only then can the host's separate device-only Keychain trust store pin the
+identity; matching pins are idempotent and changed identities are refused. The macOS support layer
+requires OS-confirmed activation before attempting this sequence. The containing app now owns a
+durable installation UUID and refreshes enrollment outside the UI thread on a bounded cadence.
+The explicit Configure Filter workflow now generates a separate device-only policy-signing key,
+publishes a signed empty-session bootstrap generation, then saves, reloads, and exactly verifies
+the public filter preferences. The bootstrap grants no process authority. While the host runs, it
+renews only near expiry and only after active-extension and exact-enabled-preference checks. The
+provider pulls newer durable generations on a bounded serial lifecycle timer; reload failure leaves
+the last verified lease to expire closed. The managed-session policy feed and entitled-device proof
+remain.

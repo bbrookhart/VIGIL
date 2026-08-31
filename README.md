@@ -6,7 +6,7 @@
 
 [![Rust](https://img.shields.io/badge/Rust-1.82%2B-CE422B?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![Swift](https://img.shields.io/badge/Swift-6.3-F05138?style=for-the-badge&logo=swift&logoColor=white)](https://swift.org/)
-[![Tests](https://img.shields.io/badge/tests-870_passing-2ea44f?style=for-the-badge)](#evidence)
+[![Tests](https://img.shields.io/badge/tests-962_passing-2ea44f?style=for-the-badge)](#evidence)
 [![unsafe](https://img.shields.io/badge/unsafe-forbidden-2ea44f?style=for-the-badge)](#evidence)
 [![License](https://img.shields.io/badge/license-Apache_2.0-1e3a8a?style=for-the-badge)](LICENSE)
 
@@ -21,10 +21,10 @@
 <table>
 <tr>
 <td align="center"><b>734</b><br/><sub>Rust tests</sub></td>
-<td align="center"><b>107</b><br/><sub>Swift tests</sub></td>
+<td align="center"><b>199</b><br/><sub>Swift tests</sub></td>
 <td align="center"><b>25</b><br/><sub>attack scenarios</sub></td>
 <td align="center"><b>12</b><br/><sub>fuzz targets</sub></td>
-<td align="center"><b>45</b><br/><sub>decision records</sub></td>
+<td align="center"><b>54</b><br/><sub>decision records</sub></td>
 <td align="center"><b>0</b><br/><sub>lines of unsafe</sub></td>
 </tr>
 </table>
@@ -609,15 +609,15 @@ labelled as available.
 | MCP authorization, identity, drift | **BETA** | argument-level authorization, binary identity |
 | MCP stdio proxy | **EXPERIMENTAL** | in the path for traffic routed through it; direct contact unmediated |
 | Network probe broker | **EXPERIMENTAL** | payload-free probe, not a firewall |
-| Network flow fast path and native adapter | **EXPERIMENTAL** | unsigned containing-app/SYSX graph builds; not signed or installed |
+| Network flow fast path and native adapter | **EXPERIMENTAL** | signed zero-authority configuration and renewal build; device proof unavailable |
 | Deception canaries | **EXPERIMENTAL** | workspace-scoped only |
 | Intent–execution reconciliation | **EXPERIMENTAL** | engine works; nothing feeds it |
 | Secret broker | **EXPERIMENTAL** | Keychain-backed git use; HTTP/signing purposes fail closed |
 | Endpoint Security fast path and adapter | **EXPERIMENTAL** | compiles; not installed, signed, or entitled |
 | Endpoint System Extension (installable) | **PLANNED** | blocked on Apple entitlement |
-| Network System Extension product | **EXPERIMENTAL** | reviewable unsigned target embeds correctly; provisioning, signing, and activation required |
+| Network System Extension product | **EXPERIMENTAL** | activation/inspection/upgrade/deactivation compile; entitled validation required |
 | `vigild` daemon and authenticated IPC | **PLANNED** | protocol compiles; no registered service |
-| SwiftUI Control Center | **EXPERIMENTAL** | minimal readiness shell builds; operational UI remains |
+| SwiftUI Control Center | **EXPERIMENTAL** | truthful extension lifecycle and composite health build; operational UI remains |
 | Signed audit checkpoints | **EXPERIMENTAL** | manual CLI checkpoints; off-host key custody/scheduling remain |
 | Process-tree termination | **EXPERIMENTAL** | opt-in; PID/start-time/executable rechecked before signals |
 | Shell broker | **NOT PLANNED** | deliberately excluded; see ADR 0007 |
@@ -626,11 +626,11 @@ labelled as available.
 
 | | |
 |---|---|
-| **Tests passing** | **870** — 734 Rust, 107 Swift, 29 Python |
+| **Tests passing** | **962** — 734 Rust, 199 Swift, 29 Python |
 | **Tests asserting something is *impossible*** | **154** — replay, forgery, mutation, escalation, cross-tenant, impersonation |
 | **Property tests** | algebraic laws over generated inputs, not just examples |
 | **Local decision latency** | 18 µs permitted, 273 µs when a detection fires (Apple M2) |
-| **Rust** | 55,373 lines across 15 crates · **Swift** 8,607 lines across 2 adapters + macOS app |
+| **Rust** | 55,373 lines across 15 crates · **Swift** 12,214 lines across 2 adapters + macOS app |
 | **Python SDK** | 1,364 lines, **zero runtime dependencies** |
 | **Static analysis** | `clippy -D warnings` clean · `#![forbid(unsafe_code)]` in every crate |
 | **Policy** | 30 rules across 6 shipped bundles, tested against the *real* bundles not fixtures |
@@ -739,12 +739,16 @@ durable in SQLite. The local secret component now reads real macOS Keychain item
 authenticate to a git remote without the credential reaching the agent; HTTP authentication and
 artifact signing are not implemented and fail rather than claiming a use. The macOS Endpoint Security fast path and API adapter are built, but System
 Extension packaging, activation, signing, and entitled-device enforcement are not. Network
-Extension signing/activation, `vigild`, XPC Mach-service registration, and the operational native
-Control Center are not yet implemented. The Network data provider, signed policy verifier, atomic
-publisher, durable replay floor, read-only startup lifecycle, containing-app configuration
-factory, and bounded preference controller compile and are XCTest-covered. A minimal SwiftUI
-containing app now embeds their unsigned System Extension product at the standard bundle path,
-but the App Group is not provisioned and the product is not signed or activatable. The Endpoint adapter contains the bounded listener lifecycle, peer verifier,
+Extension signing and entitled activation validation, `vigild`, XPC Mach-service registration, and entitled-device
+Control Center validation are not yet implemented. The Network data provider, signed policy verifier,
+atomic publisher, durable replay floor, read-only startup lifecycle, containing-app configuration
+factory, bounded preference controller, signed provider-health transport, and zero-authority bootstrap
+provisioner compile and are XCTest-covered. A minimal SwiftUI containing app now embeds their unsigned
+System Extension product at the standard bundle path and owns activation, inspection, downgrade-safe
+replacement, deactivation, and explicit filter-configuration requests. The App Group is not provisioned
+and the product is not signed or activatable here. Its composite health model requires activation,
+exact preferences, live provider generation, and matching allow/deny proof; conditional policy renewal
+is built, while the privileged allow/deny flow-proof producer remains unavailable. The Endpoint adapter contains the bounded listener lifecycle, peer verifier,
 message bridge, and atomic control service they will use. Its anonymous integration check exercises
 a real XPC request, but it is not a signed daemon/System Extension deployment.
 Installed Endpoint policy is also a runtime lease: health becomes unready at its exclusive expiry,
@@ -782,7 +786,7 @@ are in [`docs/operations/benchmarks.md`](docs/operations/benchmarks.md).
 - **Measured, not claimed** — latency and detection quality are benchmarked with documented method
 - **Cross-language contract testing** — two implementations pinned to one spec-derived vector file
 - **Documented failure modes** — every dependency has a written answer to "what if it's down?", resolved against impact tier
-- **Architecture decision records** — [45 ADRs](docs/adr/) with alternatives considered and rejected
+- **Architecture decision records** — [54 ADRs](docs/adr/) with alternatives considered and rejected
 - **Intellectual honesty** — the weakest control is labelled as such *in its own source file*
 
 Every security module carries a `Why / What / Assumptions / Failure mode / Evidence` header.
