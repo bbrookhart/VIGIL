@@ -19,6 +19,9 @@ on:
 
 permissions:
   contents: read
+  # Gitleaks enumerates the files changed by a pull request before running its local scan.
+  # Keep the workflow read-only while granting that endpoint explicitly.
+  pull-requests: read
 
 env:
   CARGO_TERM_COLOR: always
