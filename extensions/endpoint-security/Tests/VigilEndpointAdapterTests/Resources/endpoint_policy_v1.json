@@ -1,0 +1,13 @@
+{
+  "verification_time_unix_ms": 1800000000000,
+  "expected_instance_id": "endpoint-instance-fixture",
+  "trusted_key_id": "endpoint-fixture-k1",
+  "trusted_public_key": "6kpsY-KcUgq-9VB7Ey7F-ZVHdq6-vnuSQh7qaRRG0iw",
+  "envelope": {
+    "format": "vigil.signed-envelope/v1",
+    "algorithm": "Ed25519",
+    "key_id": "endpoint-fixture-k1",
+    "payload": "eyJleHBpcmVzX2F0X3VuaXhfbXMiOjE4MDAwMDAwNjAwMDAsImdlbmVyYXRpb24iOjQyLCJpc3N1ZWRfYXRfdW5peF9tcyI6MTc5OTk5OTk5OTAwMCwicHJvdGVjdGVkX3ByZWZpeGVzIjpbIi9Vc2Vycy90ZXN0Ly5hd3MiLCIvVXNlcnMvdGVzdC8uc3NoIl0sInNjaGVtYV92ZXJzaW9uIjoidmlnaWwuZW5kcG9pbnQtcG9saWN5L3YxIiwic2Vzc2lvbnMiOlt7ImFsbG93ZWRfZXhlY3V0YWJsZXMiOlsiL3Vzci9iaW4vZW52Il0sInNlc3Npb25faWQiOiJzZXNzaW9uLWZpeHR1cmUtMSIsIndvcmtzcGFjZV9yb290cyI6WyIvVXNlcnMvdGVzdC93b3Jrc3BhY2UiXX1dLCJ0YXJnZXRfaW5zdGFuY2VfaWQiOiJlbmRwb2ludC1pbnN0YW5jZS1maXh0dXJlIn0",
+    "signature": "_pqhCo-rTeRJicNv7fBEmyL5t5gOTwh4KxvG0dn7W0EQb-DCrHPkG_MFSvURW8eCk_KR8mpPwZg4EmcLeRRlCw"
+  }
+}

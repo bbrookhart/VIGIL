@@ -1,0 +1,6 @@
+// Placeholder identifiers are centralized so a future signed Xcode project does not scatter them.
+VIGIL_CONTROL_CENTER_BUNDLE_IDENTIFIER = com.vigil.security.control-center
+VIGIL_ENDPOINT_EXTENSION_BUNDLE_IDENTIFIER = com.vigil.security.endpoint
+VIGIL_NETWORK_EXTENSION_BUNDLE_IDENTIFIER = com.vigil.security.network
+VIGIL_DAEMON_BUNDLE_IDENTIFIER = com.vigil.security.daemon
+VIGIL_APPLICATION_GROUP_IDENTIFIER = group.com.vigil.security

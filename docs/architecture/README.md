@@ -77,6 +77,10 @@ asserted by convention.
 | `vigil-audit` | Hash chain, signed checkpoints, verifier | audit signing key |
 | `vigil-core` | The pipeline, risk, approvals, session state | capability + approval private keys |
 | `vigil-gateway` | The PEP, credential broker | **tool credentials** |
+| `vigil-identity` | Authenticated workload identity adapters | trust anchors / dev tokens |
+| `vigil-local` | Durable local sessions and semantic brokers | SQLite local state |
+| `vigil-endpoint` | Deadline-safe ES decisions, signed snapshots, attribution, replay, metrics | policy signing key + leased compact state |
+| `vigil-network` | Compact pinned-destination flow decisions and entitlement-free replay | leased flow policy + per-session counters |
 
 ### The separation that matters
 
@@ -141,10 +145,10 @@ been run on documented reference hardware, so quoting a number would be inventin
 
 - **VIGIL Control** — tenants, OIDC, RBAC, policy lifecycle, simulation, canary rollout
 - **VIGIL Console** — the operator UI
-- **MCP / A2A gateways** — the protocol layer models them; no proxy exists
-- **Persistence** — session state, audit and approvals are in-memory only. A Core restart
-  loses session provenance (which makes it *more* restrictive) and loses the audit chain
-  (which is unacceptable for production and is why this is pre-production)
+- **A2A gateway and remote MCP transports** — local stdio MCP traffic can use the experimental
+  proxy; authenticated remote server identity is not built
+- **Central persistence** — portable Core state remains in memory, while the local control plane
+  has SQLite/WAL sessions, approvals, budgets, incidents, and a hash-chained event timeline
 - **Multi-replica correctness** — `InMemoryNonceStore` is single-process. A multi-replica
   deployment needs a shared store, or a capability can be redeemed once per replica. This is
   documented in the type's own docs.

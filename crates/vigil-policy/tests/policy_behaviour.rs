@@ -335,6 +335,20 @@ fn workspace_writes_are_permitted_but_writes_outside_it_are_denied() {
 }
 
 #[test]
+fn workspace_prefix_confusion_is_denied() {
+    let decision = decide(
+        Req::tool("file:write", "write", SideEffectClass::InternalWrite)
+            .kind("file")
+            .paths(&["/workspace-evil/backdoor"])
+            .get(),
+    );
+    assert_eq!(decision.decision, Decision::Deny);
+    assert!(decision
+        .reason_codes
+        .contains(&ReasonCode::PathOutsideAllowlist));
+}
+
+#[test]
 fn destructive_sql_is_denied_and_reads_are_allowed() {
     let drop = decide(
         Req::tool("db:postgres", "DROP", SideEffectClass::Destructive)

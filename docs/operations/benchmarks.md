@@ -91,3 +91,83 @@ for path in sorted(glob.glob("target/criterion/decide/*/new/sample.json")):
     print(f"{name:<44} p50={q(.50)/1000:7.1f}µs p95={q(.95)/1000:7.1f}µs p99={q(.99)/1000:7.1f}µs")
 PY
 ```
+
+
+---
+
+# Local authorization latency
+
+Reproduce with:
+
+```bash
+cargo bench -p vigil-local --bench local_authorization
+```
+
+Same hardware as above. Figures are Criterion's `[lower, estimate, upper]` confidence interval
+for the per-operation mean, over 100 samples. They are not percentiles; reporting p99 would mean
+computing it, and this benchmark does not.
+
+## What is being measured
+
+The path every brokered request takes: profile ladder, session risk, lease consumption, detection
+recording, risk aggregation, and approval raising. It has grown steadily and had never been
+measured before this.
+
+| Path | lower | estimate | upper |
+|---|---:|---:|---:|
+| `allow` — permitted workspace read | 18.3 µs | **18.4 µs** | 18.5 µs |
+| `deny` — outside the workspace, no detection | 20.0 µs | **20.0 µs** | 20.1 µs |
+| `deny` — protected resource, fires a detection | 264 µs | **273 µs** | 283 µs |
+| `require_approval` — raises an approval request | 198 µs | **198 µs** | 199 µs |
+
+MCP calls authorize every resource in their arguments independently, so cost scales with the
+argument document rather than with the call:
+
+| MCP call | lower | estimate | upper |
+|---|---:|---:|---:|
+| 1 resource | 192 µs | **222 µs** | 279 µs |
+| 8 resources | 420 µs | **450 µs** | 483 µs |
+| 32 resources | 780 µs | **810 µs** | 846 µs |
+
+Roughly 20 µs of fixed cost plus ~19 µs per resource. The extraction cap is 64, so the worst
+case a hostile server can force is around 1.3 ms.
+
+## Budgets
+
+| Path | Budget | Why |
+|---|---|---|
+| Permitted brokered request | < 100 µs | The common case, on every agent action |
+| Denial without a detection | < 100 µs | Equally common; a refusal must not be slower to notice |
+| Denial with a detection | < 1 ms | Rare, and it writes durable evidence |
+| Approval raised | < 1 ms | Rare, and gated on a human anyway |
+| MCP call, capped arguments | < 2 ms | Bounded by the 64-resource extraction cap |
+
+All are met with margin.
+
+## Why the expensive paths are acceptable
+
+The 14× gap between an allow and a detection-firing deny is almost entirely SQLite transaction
+commits: a detection writes a detection row, a risk signal, a re-derived aggregate, sometimes a
+transition and an incident — each a `BEGIN IMMEDIATE` on a WAL database.
+
+That cost buys durable evidence, and **it is not a trade worth making**. Batching or deferring
+those writes would mean a session could act on a decision whose record had not landed, which is
+precisely the property `INVARIANTS.md` item 12 exists to prevent. Latency here is paid once per
+agent tool call, at LLM pace; a few hundred microseconds is not observable to anyone.
+
+## What this is not
+
+**This is not the Endpoint Security deadline path.** That path is `vigil-endpoint`, which is pure
+in-memory, allocation-light, and does no I/O at all — precisely because an ES authorization
+callback has a hard kernel deadline and a miss is a security failure. The numbers above are for
+the semantic broker path, which runs at agent-tool-call rate and has no such deadline. Conflating
+the two would be the wrong reading of every figure on this page.
+
+## A measurement artifact worth recording
+
+The first version of this benchmark reported 832 µs for the detection path. The fixture was moved
+*into* the timed routine, so its `Drop` — which removes a directory tree — was inside the timer.
+Returning the fixture instead moved the filesystem work outside and the real figure fell to 273 µs.
+
+Roughly two-thirds of the original number was the benchmark measuring itself. It is recorded here
+because a latency figure nobody has checked for that mistake is not a result.

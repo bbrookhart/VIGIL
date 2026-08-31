@@ -1,0 +1,783 @@
+<title>VIGIL Control Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;450;500;600&display=swap">
+
+<style>
+/* ─── tokens ─────────────────────────────────────────────────────────────
+   Dark is the design's home — this is an operator console — but light is
+   fully specified, not an afterthought. Every colour below is a token so
+   nothing is defined only inside a media query. */
+:root {
+  --ground:      #F2F5F7;
+  --surface:     #FFFFFF;
+  --surface-2:   #E9EEF2;
+  --sunken:      #E3E9ED;
+  --hairline:    #CFD9E0;
+  --hairline-hi: #B4C2CD;
+
+  --ink:         #10181E;
+  --ink-muted:   #55646F;
+  --ink-faint:   #8494A1;
+
+  --accent:      #B77800;
+  --accent-hi:   #8F5E00;
+  --accent-wash: rgba(183,120,0,.10);
+
+  --ok:          #1B8A4B;
+  --ok-wash:     rgba(27,138,75,.12);
+  --deny:        #C2334D;
+  --deny-wash:   rgba(194,51,77,.12);
+  --await:       #6D4AC4;
+  --await-wash:  rgba(109,74,196,.12);
+
+  --shadow: 0 1px 2px rgba(16,24,30,.06), 0 8px 24px rgba(16,24,30,.06);
+  --grid-line: rgba(16,24,30,.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:      #0E1418;
+    --surface:     #161D23;
+    --surface-2:   #1C242B;
+    --sunken:      #11171C;
+    --hairline:    #242E37;
+    --hairline-hi: #33414D;
+
+    --ink:         #DDE5EC;
+    --ink-muted:   #8494A1;
+    --ink-faint:   #5D6C78;
+
+    --accent:      #F0B429;
+    --accent-hi:   #FFC94A;
+    --accent-wash: rgba(240,180,41,.12);
+
+    --ok:          #4ADE80;
+    --ok-wash:     rgba(74,222,128,.12);
+    --deny:        #FB7185;
+    --deny-wash:   rgba(251,113,133,.12);
+    --await:       #A78BFA;
+    --await-wash:  rgba(167,139,250,.13);
+
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+    --grid-line: rgba(221,229,236,.045);
+  }
+}
+:root[data-theme="dark"] {
+  --ground:#0E1418; --surface:#161D23; --surface-2:#1C242B; --sunken:#11171C;
+  --hairline:#242E37; --hairline-hi:#33414D;
+  --ink:#DDE5EC; --ink-muted:#8494A1; --ink-faint:#5D6C78;
+  --accent:#F0B429; --accent-hi:#FFC94A; --accent-wash:rgba(240,180,41,.12);
+  --ok:#4ADE80; --ok-wash:rgba(74,222,128,.12);
+  --deny:#FB7185; --deny-wash:rgba(251,113,133,.12);
+  --await:#A78BFA; --await-wash:rgba(167,139,250,.13);
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);
+  --grid-line: rgba(221,229,236,.045);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+.label {
+  font-family: "IBM Plex Sans Condensed", "IBM Plex Sans", sans-serif;
+  font-weight: 600;
+  font-size: 10.5px;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+/* ─── shell ───────────────────────────────────────────────────────────── */
+.shell { min-height: 100vh; display: flex; flex-direction: column; }
+
+.topbar {
+  display: flex; align-items: center; gap: 20px;
+  padding: 0 20px; height: 56px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--hairline);
+  position: sticky; top: 0; z-index: 20;
+}
+
+.mark { display: flex; align-items: baseline; gap: 9px; }
+.mark .glyph { color: var(--accent); font-size: 17px; line-height: 1; }
+.mark .name {
+  font-weight: 600; font-size: 15px; letter-spacing: .17em;
+}
+.mark .sub {
+  font-size: 11px; color: var(--ink-faint); letter-spacing: .04em;
+  padding-left: 10px; margin-left: 2px; border-left: 1px solid var(--hairline);
+}
+
+.posture {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 11px 5px 9px;
+  border: 1px solid var(--accent);
+  background: var(--accent-wash);
+  border-radius: 3px;
+  color: var(--accent-hi);
+  font-size: 11.5px; font-weight: 600; letter-spacing: .07em;
+}
+.posture .dot {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-wash);
+}
+.posture-note { font-size: 11.5px; color: var(--ink-faint); max-width: 40ch; }
+
+.topbar .spacer { flex: 1; }
+
+.clock { text-align: right; }
+.clock .t { font-size: 13px; font-weight: 500; letter-spacing: .04em; }
+.clock .d { font-size: 10.5px; color: var(--ink-faint); }
+
+/* ─── console grid ────────────────────────────────────────────────────── */
+.console {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 260px minmax(0,1fr) 340px;
+  align-items: start;
+}
+.rail   { border-right: 1px solid var(--hairline); background: var(--surface); min-height: calc(100vh - 56px); }
+.main   { min-width: 0; padding: 20px; display: flex; flex-direction: column; gap: 18px; }
+.chain  { border-left: 1px solid var(--hairline); background: var(--surface); min-height: calc(100vh - 56px); }
+
+@media (max-width: 1180px) {
+  .console { grid-template-columns: 240px minmax(0,1fr); }
+  .chain { grid-column: 1 / -1; border-left: none; border-top: 1px solid var(--hairline); min-height: 0; }
+}
+@media (max-width: 820px) {
+  .console { grid-template-columns: 1fr; }
+  .rail { border-right: none; border-bottom: 1px solid var(--hairline); min-height: 0; }
+}
+
+/* ─── session rail ────────────────────────────────────────────────────── */
+.rail-head {
+  padding: 14px 16px 10px;
+  display: flex; align-items: baseline; justify-content: space-between;
+  border-bottom: 1px solid var(--hairline);
+}
+.rail-count { font-size: 11px; color: var(--ink-faint); }
+
+.session-btn {
+  width: 100%; text-align: left; cursor: pointer;
+  background: none; border: none; border-bottom: 1px solid var(--hairline);
+  border-left: 2px solid transparent;
+  padding: 12px 16px;
+  display: grid; gap: 6px;
+  color: inherit; font: inherit;
+  transition: background .12s ease, border-color .12s ease;
+}
+.session-btn:hover { background: var(--surface-2); }
+.session-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.session-btn[aria-current="true"] {
+  background: var(--surface-2);
+  border-left-color: var(--accent);
+}
+.session-btn .sid { font-size: 11.5px; letter-spacing: .02em; }
+.session-btn .meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.session-btn .prof { font-size: 11px; color: var(--ink-muted); }
+
+/* ─── chips ───────────────────────────────────────────────────────────── */
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 7px; border-radius: 2px;
+  font-size: 10px; font-weight: 600; letter-spacing: .06em;
+  text-transform: uppercase; white-space: nowrap;
+  border: 1px solid transparent;
+}
+.chip::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.chip.normal      { color: var(--ok);     background: var(--ok-wash);     border-color: color-mix(in srgb, var(--ok) 30%, transparent); }
+.chip.elevated    { color: var(--accent); background: var(--accent-wash); border-color: color-mix(in srgb, var(--accent) 34%, transparent); }
+.chip.restricted  { color: var(--await);  background: var(--await-wash);  border-color: color-mix(in srgb, var(--await) 34%, transparent); }
+.chip.contained,
+.chip.quarantined { color: var(--deny);   background: var(--deny-wash);   border-color: color-mix(in srgb, var(--deny) 34%, transparent); }
+.chip.plain::before { display: none; }
+.chip.plain { color: var(--ink-muted); background: var(--sunken); border-color: var(--hairline); }
+
+/* ─── panels ──────────────────────────────────────────────────────────── */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  box-shadow: var(--shadow);
+}
+.panel-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 11px 14px; border-bottom: 1px solid var(--hairline);
+}
+.panel-body { padding: 14px; }
+.panel-body.flush { padding: 0; }
+
+/* session header */
+.sess-head { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 20px; padding: 16px; }
+.sess-head .id { font-size: 17px; font-weight: 500; letter-spacing: .01em; }
+.sess-head .ws { font-size: 12px; color: var(--ink-muted); margin-top: 3px; }
+.sess-stats { display: flex; gap: 22px; margin-left: auto; }
+.stat .v { font-size: 19px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.stat .v.deny { color: var(--deny); }
+.stat .v.await { color: var(--await); }
+
+/* ─── risk ratchet ────────────────────────────────────────────────────────
+   Risk is monotone within a session: it can rise and can never fall. Drawn
+   as a pawl on a toothed track so the constraint is visible, not just told. */
+.ratchet { padding: 16px 14px 14px; }
+.track {
+  position: relative;
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  gap: 3px; margin-bottom: 9px;
+}
+.tooth {
+  height: 30px; border-radius: 2px;
+  background: var(--sunken); border: 1px solid var(--hairline);
+  position: relative; overflow: hidden;
+}
+.tooth::after {
+  content: ""; position: absolute; inset: 0;
+  background: repeating-linear-gradient(-45deg, transparent 0 5px, var(--grid-line) 5px 10px);
+}
+.tooth.reached { background: var(--tooth-c); border-color: var(--tooth-b); }
+.tooth.current { box-shadow: inset 0 0 0 1px var(--tooth-b); }
+.tooth.current::before {
+  content: ""; position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
+  border-left: 5px solid transparent; border-right: 5px solid transparent;
+  border-bottom: 6px solid var(--tooth-b);
+}
+.rung-labels { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; }
+.rung-labels span { font-size: 9px; text-align: center; color: var(--ink-faint); letter-spacing: .05em; }
+.rung-labels span.on { color: var(--ink); font-weight: 600; }
+.ratchet-note { margin-top: 11px; font-size: 11.5px; color: var(--ink-muted); }
+.ratchet-note b { color: var(--ink); font-weight: 500; }
+
+/* ─── leases ──────────────────────────────────────────────────────────── */
+.lease { padding: 11px 14px; border-bottom: 1px solid var(--hairline); display: grid; gap: 7px; }
+.lease:last-child { border-bottom: none; }
+.lease-top { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.lease-act { font-size: 12.5px; font-weight: 500; }
+.lease-res { font-size: 11px; color: var(--ink-muted); word-break: break-all; }
+.lease-bar { height: 3px; background: var(--sunken); border-radius: 2px; overflow: hidden; }
+.lease-fill { height: 100%; background: var(--accent); transition: width .5s linear; }
+.lease-fill.expiring { background: var(--deny); }
+.lease-foot { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--ink-faint); }
+.lease.dead { opacity: .48; }
+.lease.dead .lease-fill { background: var(--ink-faint); }
+
+/* ─── budgets ─────────────────────────────────────────────────────────── */
+.budget { display: grid; grid-template-columns: 128px 1fr 64px; gap: 12px; align-items: center; padding: 6px 0; }
+.budget-name { font-size: 12px; color: var(--ink-muted); }
+.budget-track { height: 6px; background: var(--sunken); border-radius: 3px; overflow: hidden; position: relative; }
+.budget-fill { height: 100%; border-radius: 3px; background: var(--ok); }
+.budget-fill.warn { background: var(--accent); }
+.budget-fill.full { background: var(--deny); }
+.budget-num { font-size: 11.5px; text-align: right; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+
+/* ─── decisions ───────────────────────────────────────────────────────── */
+.dec { display: grid; grid-template-columns: 62px 1fr auto; gap: 11px; align-items: baseline;
+       padding: 8px 14px; border-bottom: 1px solid var(--hairline); font-size: 12px; }
+.dec:last-child { border-bottom: none; }
+.dec-v { font-size: 10px; font-weight: 600; letter-spacing: .06em; }
+.dec-v.allow { color: var(--ok); }
+.dec-v.deny  { color: var(--deny); }
+.dec-v.await { color: var(--await); }
+.dec-act { font-size: 11.5px; }
+.dec-res { color: var(--ink-faint); font-size: 11px; word-break: break-all; }
+.dec-t { font-size: 10.5px; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.dec-why { grid-column: 2 / -1; font-size: 10.5px; color: var(--ink-muted); }
+
+/* ─── audit chain spine ───────────────────────────────────────────────── */
+.chain-head { padding: 14px 16px 11px; border-bottom: 1px solid var(--hairline); }
+.chain-verify {
+  margin-top: 9px; display: flex; align-items: center; gap: 7px;
+  font-size: 11.5px; color: var(--ok);
+}
+.chain-verify .tick {
+  width: 15px; height: 15px; border-radius: 50%;
+  background: var(--ok-wash); color: var(--ok);
+  display: grid; place-items: center; font-size: 9px; font-weight: 700;
+}
+.spine { padding: 14px 16px 20px; position: relative; }
+.link { position: relative; padding: 0 0 14px 22px; }
+.link::before {
+  content: ""; position: absolute; left: 4px; top: 5px;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--surface); border: 1.5px solid var(--hairline-hi);
+}
+.link::after {
+  content: ""; position: absolute; left: 7px; top: 14px; bottom: 0; width: 1px;
+  background: var(--hairline);
+}
+.link:last-child::after { display: none; }
+.link.checkpoint::before { background: var(--accent); border-color: var(--accent); }
+.link .seq { font-size: 10px; color: var(--ink-faint); letter-spacing: .05em; }
+.link .h { font-size: 10.5px; color: var(--ink-muted); word-break: break-all; line-height: 1.45; }
+.link .what { font-size: 11.5px; margin: 1px 0 2px; }
+.link.checkpoint .what { color: var(--accent-hi); font-weight: 500; }
+
+.chain-foot {
+  margin: 0 16px 18px; padding: 11px 12px;
+  background: var(--sunken); border: 1px solid var(--hairline); border-radius: 3px;
+  font-size: 11px; color: var(--ink-muted); line-height: 1.55;
+}
+.chain-foot b { color: var(--ink); font-weight: 500; }
+
+/* ─── detections ──────────────────────────────────────────────────────── */
+.det { display: grid; gap: 3px; padding: 10px 14px; border-bottom: 1px solid var(--hairline);
+       border-left: 2px solid var(--sev); }
+.det:last-child { border-bottom: none; }
+.det-top { display: flex; align-items: center; gap: 8px; }
+.det-rule { font-size: 10.5px; color: var(--ink-faint); letter-spacing: .04em; }
+.det-name { font-size: 12px; font-weight: 500; }
+.det-desc { font-size: 11px; color: var(--ink-muted); }
+
+/* ─── process tree ────────────────────────────────────────────────────── */
+.proc { display: flex; align-items: baseline; gap: 9px; padding: 5px 0; font-size: 12px; }
+.proc .tw { color: var(--ink-faint); font-size: 11px; }
+.proc .exe { font-size: 11.5px; }
+.proc .pid { font-size: 10.5px; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+
+.empty { padding: 22px 14px; text-align: center; font-size: 12px; color: var(--ink-faint); }
+
+.foot {
+  border-top: 1px solid var(--hairline); background: var(--surface);
+  padding: 13px 20px; font-size: 11px; color: var(--ink-faint);
+  display: flex; gap: 18px; flex-wrap: wrap; align-items: center;
+}
+.foot .sep { color: var(--hairline-hi); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+</style>
+
+<div class="shell">
+
+  <header class="topbar">
+    <div class="mark">
+      <span class="glyph">◈</span>
+      <span class="name">VIGIL</span>
+      <span class="sub">Control Center</span>
+    </div>
+
+    <div class="posture" title="VIGIL never reports itself as protecting more than it does.">
+      <span class="dot"></span>OBSERVE ONLY
+    </div>
+    <div class="posture-note">
+      Brokered operations are enforced. A process that bypasses the brokers is not.
+    </div>
+
+    <div class="spacer"></div>
+
+    <div class="clock">
+      <div class="t mono" id="clock">--:--:--</div>
+      <div class="d">session clock</div>
+    </div>
+  </header>
+
+  <div class="console">
+
+    <nav class="rail" aria-label="Agent sessions">
+      <div class="rail-head">
+        <span class="label">Sessions</span>
+        <span class="rail-count mono" id="railCount"></span>
+      </div>
+      <div id="sessionList"></div>
+    </nav>
+
+    <main class="main">
+
+      <section class="panel">
+        <div class="sess-head">
+          <div>
+            <div class="id mono" id="sessId"></div>
+            <div class="ws mono" id="sessWs"></div>
+          </div>
+          <div class="sess-stats">
+            <div class="stat">
+              <div class="v" id="statAllow">0</div>
+              <div class="label">Permitted</div>
+            </div>
+            <div class="stat">
+              <div class="v deny" id="statDeny">0</div>
+              <div class="label">Refused</div>
+            </div>
+            <div class="stat">
+              <div class="v await" id="statAwait">0</div>
+              <div class="label">Awaiting</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <span class="label">Risk</span>
+          <span class="chip plain">monotone</span>
+        </div>
+        <div class="ratchet">
+          <div class="track" id="riskTrack"></div>
+          <div class="rung-labels" id="riskLabels"></div>
+          <p class="ratchet-note" id="riskNote"></p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <span class="label">Capability leases</span>
+          <span class="chip plain" id="leaseCount"></span>
+        </div>
+        <div class="panel-body flush" id="leases"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <span class="label">Blast radius</span>
+          <span class="chip plain">per session</span>
+        </div>
+        <div class="panel-body" id="budgets"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <span class="label">Detections</span>
+        </div>
+        <div class="panel-body flush" id="detections"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <span class="label">Decisions</span>
+          <span class="chip plain">most recent first</span>
+        </div>
+        <div class="panel-body flush" id="decisions"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <span class="label">Process lineage</span>
+          <span class="chip plain" id="procNote"></span>
+        </div>
+        <div class="panel-body" id="procs"></div>
+      </section>
+
+    </main>
+
+    <aside class="chain" aria-label="Audit chain">
+      <div class="chain-head">
+        <span class="label">Audit chain</span>
+        <div class="chain-verify">
+          <span class="tick">✓</span>
+          <span id="chainStatus">verified — 0 events</span>
+        </div>
+      </div>
+      <div class="spine" id="spine"></div>
+      <p class="chain-foot">
+        <b>Links detect an edit. Checkpoints detect a rewrite.</b>
+        Anything that can write the database can recompute every hash chain link.
+        A checkpoint signs the head with a key held outside it, so a rewritten log
+        can no longer be made self-consistent.
+      </p>
+    </aside>
+
+  </div>
+
+  <footer class="foot">
+    <span>Local control plane · SQLite schema v13 · WAL</span>
+    <span class="sep">·</span>
+    <span>Decision latency 18&thinsp;µs permitted, 273&thinsp;µs on detection</span>
+    <span class="sep">·</span>
+    <span>Endpoint Security: not installed</span>
+    <span class="sep">·</span>
+    <span>Network Extension: not installed</span>
+    <span class="sep">·</span>
+    <span><code class="mono">vigild</code>: not built — invariant 3 unmet at the OS level</span>
+  </footer>
+
+</div>
+
+<script>
+/* Representative state shaped exactly like the local control plane's own tables:
+   sessions, capability_leases, budget_counters, risk_transitions, detections,
+   events, processes, chain_checkpoints. */
+
+const RUNGS = ["NORMAL", "ELEVATED", "RESTRICTED", "CONTAINED", "QUARANTINED"];
+const RUNG_COLOR = {
+  NORMAL:      ["var(--ok-wash)",     "var(--ok)"],
+  ELEVATED:    ["var(--accent-wash)", "var(--accent)"],
+  RESTRICTED:  ["var(--await-wash)",  "var(--await)"],
+  CONTAINED:   ["var(--deny-wash)",   "var(--deny)"],
+  QUARANTINED: ["var(--deny-wash)",   "var(--deny)"],
+};
+
+const SESSIONS = [
+  {
+    id: "ags_7c41e0d9b2a4",
+    profile: "developer-standard",
+    workspace: "~/src/payments-api",
+    risk: "ELEVATED",
+    riskWhy: "A capability was refused, then requested again within the same session.",
+    leases: [
+      { action: "fs.delete", resource: "~/src/payments-api/tmp/build.lock", ttl: 900, left: 612, uses: 1, max: 1 },
+      { action: "git.push",  resource: "origin main", ttl: 900, left: 138, uses: 1, max: 2 },
+    ],
+    budgets: [
+      ["File reads",     41, 120], ["File writes", 18, 40], ["File deletes", 2, 5],
+      ["File renames",    1, 10],  ["Process execs", 6, 15], ["Network destinations", 2, 4],
+    ],
+    detections: [],
+    decisions: [
+      ["ALLOW", "fs.write",     "src/handlers/refund.rs",      "2s",  "inside workspace root"],
+      ["ALLOW", "process.exec", "/usr/bin/cargo test",         "9s",  "exact-path allowlisted utility"],
+      ["AWAIT", "git.push",     "origin main",                 "44s", "profile does not grant push; approval requested"],
+      ["DENY",  "fs.read",      "~/.ssh/id_ed25519",           "1m",  "protected registry — outside any workspace"],
+      ["ALLOW", "fs.read",      "Cargo.toml",                  "2m",  "inside workspace root"],
+    ],
+    procs: [
+      [0, "/usr/bin/cargo", 44120, "running"],
+      [1, "rustc",          44139, "exited 0"],
+    ],
+    chain: [
+      ["1041", "git.push — approval requested", false],
+      ["1040", "fs.read — DENY ~/.ssh/id_ed25519", false],
+      ["1039", "checkpoint signed at 1039", true],
+      ["1038", "process.exec — ALLOW cargo", false],
+      ["1037", "fs.write — ALLOW refund.rs", false],
+    ],
+  },
+  {
+    id: "ags_3f9a11c7e480",
+    profile: "untrusted-agent",
+    workspace: "~/scratch/issue-4471",
+    risk: "QUARANTINED",
+    riskWhy: "Credential access followed by an egress attempt — a sequence, not a single event.",
+    leases: [
+      { action: "fs.write", resource: "~/scratch/issue-4471/notes.md", ttl: 900, left: 0, uses: 0, max: 1 },
+    ],
+    budgets: [
+      ["File reads",     88, 90], ["File writes", 12, 12], ["File deletes", 0, 2],
+      ["File renames",    0, 2],  ["Process execs", 4, 4], ["Network destinations", 1, 1],
+    ],
+    detections: [
+      ["VIGIL-L044", "Credential access before egress", "critical",
+       "A protected credential path was read, then a new network destination was requested. Neither event is conclusive alone."],
+      ["VIGIL-L021", "Repository configured to execute", "medium",
+       "The repository sets core.sshCommand. The brokered git path neutralises it; a naive invocation would not."],
+    ],
+    decisions: [
+      ["DENY",  "net.connect",  "paste.example.net:443",   "6s",  "destination not on the session allowlist"],
+      ["DENY",  "fs.read",      "~/.aws/credentials",      "31s", "protected registry — outside any workspace"],
+      ["DENY",  "process.exec", "/bin/sh",                 "48s", "shells are denied for this profile"],
+      ["ALLOW", "fs.read",      "issue-4471/repro.py",     "3m",  "inside workspace root"],
+    ],
+    procs: [
+      [0, "python3", 51204, "terminated"],
+    ],
+    chain: [
+      ["2210", "net.connect — DENY paste.example.net", false],
+      ["2209", "incident opened — severity CRITICAL", false],
+      ["2208", "checkpoint signed at 2208", true],
+      ["2207", "fs.read — DENY ~/.aws/credentials", false],
+      ["2206", "process.exec — DENY /bin/sh", false],
+    ],
+  },
+  {
+    id: "ags_b8d2740fa159",
+    profile: "developer-standard",
+    workspace: "~/src/docs-site",
+    risk: "NORMAL",
+    riskWhy: "No signal has been raised. Risk starts here and only ever moves right.",
+    leases: [],
+    budgets: [
+      ["File reads",     12, 120], ["File writes", 4, 40], ["File deletes", 0, 5],
+      ["File renames",    0, 10],  ["Process execs", 1, 15], ["Network destinations", 0, 4],
+    ],
+    detections: [],
+    decisions: [
+      ["ALLOW", "fs.write",     "content/guides/install.md", "12s", "inside workspace root"],
+      ["ALLOW", "process.exec", "/usr/bin/node",             "1m",  "exact-path allowlisted utility"],
+    ],
+    procs: [[0, "/usr/bin/node", 39887, "running"]],
+    chain: [
+      ["612", "fs.write — ALLOW install.md", false],
+      ["611", "process.exec — ALLOW node", false],
+      ["610", "session.start — developer-standard", false],
+    ],
+  },
+];
+
+let active = 0;
+const $ = (id) => document.getElementById(id);
+
+function riskIndex(r) { return RUNGS.indexOf(r); }
+
+function renderRail() {
+  $("railCount").textContent = SESSIONS.length + " active";
+  $("sessionList").innerHTML = SESSIONS.map((s, i) => `
+    <button class="session-btn" aria-current="${i === active}" data-i="${i}">
+      <span class="sid mono">${s.id}</span>
+      <span class="meta">
+        <span class="prof">${s.profile}</span>
+        <span class="chip ${s.risk.toLowerCase()}">${s.risk}</span>
+      </span>
+    </button>`).join("");
+  document.querySelectorAll(".session-btn").forEach((b) =>
+    b.addEventListener("click", () => { active = +b.dataset.i; render(); }));
+}
+
+function renderRisk(s) {
+  const at = riskIndex(s.risk);
+  $("riskTrack").innerHTML = RUNGS.map((r, i) => {
+    const [wash, edge] = RUNG_COLOR[s.risk];
+    const cls = i < at ? "tooth reached" : i === at ? "tooth reached current" : "tooth";
+    const style = i <= at ? `style="--tooth-c:${wash};--tooth-b:${edge}"` : "";
+    return `<div class="${cls}" ${style}></div>`;
+  }).join("");
+  $("riskLabels").innerHTML = RUNGS.map((r, i) =>
+    `<span class="${i === at ? "on" : ""}">${r}</span>`).join("");
+  $("riskNote").innerHTML =
+    `<b>${s.risk}.</b> ${s.riskWhy} Risk never decreases within a session — an agent cannot
+     work its own risk back down, so a session that trips a signal stays degraded until it ends.`;
+}
+
+function renderLeases(s) {
+  $("leaseCount").textContent = s.leases.length ? s.leases.length + " held" : "none held";
+  if (!s.leases.length) {
+    $("leases").innerHTML = `<p class="empty">No capability leases.
+      Every action is decided by the profile alone.</p>`;
+    return;
+  }
+  $("leases").innerHTML = s.leases.map((l) => {
+    const dead = l.left <= 0 || l.uses <= 0;
+    const pct = Math.max(0, Math.min(100, (l.left / l.ttl) * 100));
+    const low = pct < 25;
+    return `
+      <div class="lease ${dead ? "dead" : ""}">
+        <div class="lease-top">
+          <span class="lease-act mono">${l.action}</span>
+          ${dead ? '<span class="chip plain">expired</span>'
+                 : `<span class="chip normal">${l.uses} of ${l.max} uses left</span>`}
+        </div>
+        <div class="lease-res mono">${l.resource}</div>
+        <div class="lease-bar">
+          <div class="lease-fill ${low && !dead ? "expiring" : ""}" style="width:${pct}%"></div>
+        </div>
+        <div class="lease-foot">
+          <span>bound to this action and resolved resource</span>
+          <span class="mono">${dead ? "0s" : Math.floor(l.left) + "s"}</span>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+function renderBudgets(s) {
+  $("budgets").innerHTML = s.budgets.map(([name, used, cap]) => {
+    const pct = (used / cap) * 100;
+    const cls = pct >= 100 ? "full" : pct >= 70 ? "warn" : "";
+    return `
+      <div class="budget">
+        <span class="budget-name">${name}</span>
+        <span class="budget-track"><span class="budget-fill ${cls}" style="width:${Math.min(100, pct)}%"></span></span>
+        <span class="budget-num mono">${used} / ${cap}</span>
+      </div>`;
+  }).join("");
+}
+
+function renderDetections(s) {
+  if (!s.detections.length) {
+    $("detections").innerHTML = `<p class="empty">Nothing detected.</p>`;
+    return;
+  }
+  const colour = { critical: "var(--deny)", high: "var(--deny)", medium: "var(--accent)", low: "var(--ink-faint)" };
+  $("detections").innerHTML = s.detections.map(([rule, name, sev, desc]) => `
+    <div class="det" style="--sev:${colour[sev]}">
+      <div class="det-top">
+        <span class="det-rule mono">${rule}</span>
+        <span class="chip ${sev === "medium" ? "elevated" : "quarantined"}">${sev}</span>
+      </div>
+      <div class="det-name">${name}</div>
+      <div class="det-desc">${desc}</div>
+    </div>`).join("");
+}
+
+function renderDecisions(s) {
+  const cls = { ALLOW: "allow", DENY: "deny", AWAIT: "await" };
+  const word = { ALLOW: "ALLOW", DENY: "DENY", AWAIT: "APPROVAL" };
+  $("decisions").innerHTML = s.decisions.map(([v, act, res, t, why]) => `
+    <div class="dec">
+      <span class="dec-v ${cls[v]}">${word[v]}</span>
+      <span class="dec-act mono">${act}</span>
+      <span class="dec-t">${t} ago</span>
+      <span class="dec-res mono">${res}</span>
+      <span class="dec-why">${why}</span>
+    </div>`).join("");
+
+  const count = (v) => s.decisions.filter((d) => d[0] === v).length;
+  $("statAllow").textContent = count("ALLOW");
+  $("statDeny").textContent  = count("DENY");
+  $("statAwait").textContent = count("AWAIT");
+}
+
+function renderProcs(s) {
+  $("procNote").textContent = "generation-ordered";
+  $("procs").innerHTML = s.procs.map(([gen, exe, pid, st]) => `
+    <div class="proc">
+      <span class="tw mono">${gen === 0 ? "└─" : "&nbsp;&nbsp;└─"}</span>
+      <span class="exe mono">${exe}</span>
+      <span class="pid mono">pid ${pid}</span>
+      <span class="chip ${st === "running" ? "normal" : st === "terminated" ? "quarantined" : "plain"}">${st}</span>
+    </div>`).join("");
+}
+
+function renderChain(s) {
+  $("chainStatus").textContent = `verified — ${s.chain.length} links shown`;
+  $("spine").innerHTML = s.chain.map(([seq, what, isCheck]) => `
+    <div class="link ${isCheck ? "checkpoint" : ""}">
+      <div class="seq mono">SEQ ${seq}</div>
+      <div class="what">${what}</div>
+      <div class="h mono">sha256:${fakeHash(seq)}</div>
+    </div>`).join("");
+}
+
+/* Deterministic stand-in so the same sequence always renders the same digest. */
+function fakeHash(seed) {
+  let h = 0x811c9dc5;
+  for (const c of String(seed)) { h ^= c.charCodeAt(0); h = Math.imul(h, 0x01000193) >>> 0; }
+  let out = "";
+  for (let i = 0; i < 6; i++) { h = Math.imul(h ^ (h >>> 13), 0x5bd1e995) >>> 0; out += h.toString(16).padStart(8, "0"); }
+  return out.slice(0, 40);
+}
+
+function render() {
+  const s = SESSIONS[active];
+  renderRail();
+  $("sessId").textContent = s.id;
+  $("sessWs").textContent = s.workspace + "  ·  " + s.profile;
+  renderRisk(s); renderLeases(s); renderBudgets(s);
+  renderDetections(s); renderDecisions(s); renderProcs(s); renderChain(s);
+}
+
+/* Leases are time-bounded, so the panel shows them actually running down.
+   This is the one moving thing on the page: it is the subject, not decoration. */
+function tick() {
+  const now = new Date();
+  $("clock").textContent = now.toTimeString().slice(0, 8);
+  let changed = false;
+  for (const s of SESSIONS) {
+    for (const l of s.leases) {
+      if (l.left > 0) { l.left = Math.max(0, l.left - 1); changed = true; }
+    }
+  }
+  if (changed) renderLeases(SESSIONS[active]);
+}
+
+render();
+tick();
+setInterval(tick, 1000);
+</script>

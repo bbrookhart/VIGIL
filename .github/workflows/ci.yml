@@ -54,6 +54,14 @@ jobs:
         with: { toolchain: stable }
       - uses: Swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2.7.5
       - run: cargo test --workspace --locked
+      # Named separately so the adversarial claim in the README maps to a visible job step.
+      # These execute the threat model's attack scenarios and assert each one fails.
+      # §89 lists the conditions under which a release candidate fails. Prose does not fail a
+      # build, so each is a test named for the condition. This is the "can we ship?" job.
+      - name: Release security gates
+        run: cargo test -p vigil-cli --test release_gates -- --nocapture
+      - name: Adversarial scenarios
+        run: cargo test -p vigil-cli --test adversarial -- --nocapture
 
   python:
     name: Python SDK
@@ -66,6 +74,26 @@ jobs:
       - run: pytest sdk/python/tests -q
       - run: mypy sdk/python/vigil_sdk
       - run: ruff check sdk/python
+
+  macos-endpoint-adapter:
+    name: macOS Endpoint adapter
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      # This compiles the public EndpointSecurity API adapter and runs its entitlement-free
+      # deadline, authorization, and signed Rust-policy parity checks. GitHub-hosted runners do
+      # not validate extension activation, Full Disk Access, signing, or Apple's entitlement.
+      - run: swift test --disable-sandbox --package-path extensions/endpoint-security
+
+  macos-network-adapter:
+    name: macOS Network adapter
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      # This compiles the public NEFilterDataProvider boundary and runs the signed Rust-policy,
+      # expiry, pinned-address, rebinding, and generation checks. It does not claim that a
+      # GitHub-hosted runner activated or received an entitlement for a System Extension.
+      - run: swift test --disable-sandbox --package-path extensions/network-filter
 
   contract:
     name: Cross-language contract
@@ -81,7 +109,23 @@ jobs:
       # canonicalization is a signature-forgery primitive, so this is a blocking gate.
       - run: cargo test -p vigil-common --test canonical_contract
       - run: cargo test -p vigil-protocol --test sdk_wire_contract
+      - run: cargo test -p vigil-endpoint committed_swift_fixture_is_the_exact_rust_signed_contract
+      - run: cargo test -p vigil-network signed
       - run: pytest sdk/python/tests/test_canonical_contract.py -q
+      - name: Endpoint policy fixture must be current
+        run: |
+          cargo run -q -p vigil-endpoint --example generate_policy_fixture \
+            > /tmp/endpoint_policy_v1.json
+          diff -u \
+            extensions/endpoint-security/Tests/VigilEndpointAdapterTests/Resources/endpoint_policy_v1.json \
+            /tmp/endpoint_policy_v1.json
+      - name: Network policy fixture must be current
+        run: |
+          cargo run -q -p vigil-network --example generate_network_policy_fixture \
+            > /tmp/network_policy_v1.json
+          diff -u \
+            extensions/network-filter/Tests/VigilNetworkAdapterTests/Resources/network_policy_v1.json \
+            /tmp/network_policy_v1.json
       # The committed fixture must match what the SDK produces today.
       - run: |
           python scripts/generate_wire_fixture.py
@@ -158,6 +202,12 @@ jobs:
   fuzz:
     name: Fuzz smoke
     runs-on: ubuntu-latest
+    # Targets are discovered with `cargo fuzz list`, so adding one to fuzz/Cargo.toml is
+    # enough to have it replayed and smoked here. Twelve targets cover canonicalization,
+    # capability tokens, policy bundles, network analysis, path traversal, action requests, MCP
+    # argument extraction, MCP manifests, Git remote hosts, reconciliation, `ps` process
+    # identity, and Keychain attribute dumps.
+    #
     # Short passes so a newly-introduced panic is caught on the commit that introduces it.
     # Sustained campaigns run out of band; 60s per target explores the shallow input space
     # only. See fuzz/README.md.
@@ -195,6 +245,8 @@ jobs:
       # be anything but a source of false failures. The published numbers in
       # docs/operations/benchmarks.md come from documented hardware.
       - run: cargo bench -p vigil-core --bench decision_pipeline | tee bench.txt
+      # The local authorization path — every brokered request goes through it.
+      - run: cargo bench -p vigil-local --bench local_authorization | tee -a bench.txt
       - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
         with: { name: benchmarks, path: bench.txt }
 
