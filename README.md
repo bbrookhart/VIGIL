@@ -1,17 +1,57 @@
 <div align="center">
 
-# VIGIL
+<br/>
+
+# ◈ &nbsp;V I G I L
 
 ### Runtime security for autonomous AI agents
 
-**Stops an AI agent from doing something dangerous — before it happens, not after.**
+**An agent asks. VIGIL decides. Only then does anything reach the world.**
 
-[![Rust](https://img.shields.io/badge/Rust-1.82%2B-CE422B?logo=rust&logoColor=white)](https://www.rust-lang.org/)
-[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-709_passing-2ea44f)](#evidence)
-[![Clippy](https://img.shields.io/badge/clippy-D_warnings_clean-2ea44f)](#evidence)
-[![unsafe](https://img.shields.io/badge/unsafe-forbidden-2ea44f)](#evidence)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+<br/>
+
+[![Rust](https://img.shields.io/badge/Rust-1.82%2B-CE422B?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![Swift](https://img.shields.io/badge/Swift-6.3-F05138?style=for-the-badge&logo=swift&logoColor=white)](https://swift.org/)
+[![Tests](https://img.shields.io/badge/tests-842_passing-2ea44f?style=for-the-badge)](#evidence)
+[![unsafe](https://img.shields.io/badge/unsafe-forbidden-2ea44f?style=for-the-badge)](#evidence)
+[![License](https://img.shields.io/badge/license-Apache_2.0-1e3a8a?style=for-the-badge)](LICENSE)
+
+<br/>
+
+<table>
+<tr>
+<td align="center"><b>733</b><br/><sub>Rust tests</sub></td>
+<td align="center"><b>80</b><br/><sub>Swift tests</sub></td>
+<td align="center"><b>25</b><br/><sub>attack scenarios</sub></td>
+<td align="center"><b>12</b><br/><sub>fuzz targets</sub></td>
+<td align="center"><b>42</b><br/><sub>decision records</sub></td>
+<td align="center"><b>0</b><br/><sub>lines of unsafe</sub></td>
+</tr>
+</table>
+
+<br/>
+
+</div>
+
+> **The one-sentence version.** An AI agent that reads a web page can be instructed *by that
+> web page* to email your secrets to an attacker. No amount of model tuning closes this, because
+> the model is working exactly as designed. VIGIL moves the boundary out of the model and puts it
+> between the agent's *intent* and the world's *state*.
+
+<div align="center">
+
+```
+     ┌─────────┐        ┌──────────────────┐        ┌──────────────┐
+     │  AGENT  │───────▶│      VIGIL       │───────▶│  REAL WORLD  │
+     │         │  asks  │  decides · signs │  only  │  files · net │
+     │ holds   │        │  records · bounds│  if    │  secrets     │
+     │ nothing │◀───────│                  │  allowed              │
+     └─────────┘ refuse └──────────────────┘        └──────────────┘
+                              │
+                              ▼
+                    tamper-evident record
+                    of every decision made
+```
 
 </div>
 
@@ -304,36 +344,34 @@ sockets yet. See [ADR 0035](docs/adr/0035-network-flow-authority-is-hostname-plu
 [ADR 0036](docs/adr/0036-macos-network-policy-arrives-out-of-band.md), and the
 [Network Extension model](docs/architecture/NETWORK_EXTENSION_MODEL.md).
 
-> [!WARNING]
-> `vigil run` does **not** yet sandbox its child. The filesystem and process brokers enforce
-> operations that actually pass through them, but cannot stop a process from bypassing them.
-> The process broker kills only its direct child on timeout; enforced profiles therefore allow
-> only a tiny exact-path set of side-effect-free utilities while shells and interpreters remain
-> denied. The network probe broker sends no payload and is not a firewall; direct sockets remain
-> bypassable. The secret broker is currently an interface/simulator only—there is no native
-> Keychain provider or CLI use path. The Endpoint Security and Network data-provider adapters
-> compile, but this repository does not yet contain an activatable, signed, entitled System
-> Extension. Until those extensions, authenticated daemon IPC, and entitled release path exist,
-> launched processes retain the user's ambient macOS authority. The CLI reports `OBSERVE ONLY` and never
-> calls this state protected.
->
-> Approvals are **not** a trust boundary yet. No broker can reach the grant path — the type it
-> requires cannot be constructed from broker code, and a test asserts no broker references it — so
-> a refactor cannot open that path by accident. But with no `vigild` and no authenticated IPC, an
-> agent runs as the same user as the operator and can invoke `vigil approvals grant` itself.
-> Invariant 3, no self-authorization, is not satisfied at the operating-system level.
->
-> `vigil contain` does **not** terminate anything. Killing a process safely needs certainty that
-> the PID still belongs to the process VIGIL recorded, which requires OS-verified process identity
-> this build does not have. Containment withholds authority from brokered requests; a process
-> already running is unaffected.
->
-> The MCP stdio proxy mediates traffic explicitly routed through it, binds the launched executable
-> to the registered binary identity, and refuses protected-resource calls before the server sees
-> them. An agent that contacts a server directly remains unmediated.
->
-> Reconciliation compares two records; it does not produce the second one. Until an entitled
-> System Extension is installed, every reconciliation on a real session reports `NO_OBSERVER`.
+> [!IMPORTANT]
+> **VIGIL reports `OBSERVE ONLY` at the OS boundary, and means it.**
+> Every control below is enforced for operations that pass *through* VIGIL. None of them can
+> stop a process that ignores VIGIL and calls the kernel directly. That needs an entitled
+> System Extension, which Apple must grant and has not.
+
+<div align="center">
+
+### What is enforced, and what is not
+
+</div>
+
+| Control | Status | What that actually means |
+|:--|:--|:--|
+| **Policy decisions** | 🟢 Enforced | Monotone, order-independent, deterministic. No path from `DENY` to `ALLOW`. |
+| **Capability leases** | 🟢 Enforced | TTL-bounded, use-counted, non-delegable by database constraint. Expiry is a SQL predicate, so it needs no cleanup job. |
+| **Blast-radius budgets** | 🟢 Enforced | Reserved and committed in one `BEGIN IMMEDIATE` transaction; the arithmetic is constrained by the database, not the caller. |
+| **Filesystem / process / git brokers** | 🟢 Enforced | Device+inode identity, no shell, no `PATH` lookup, repository config neutralised. |
+| **Audit chain** | 🟢 Enforced | Hash-chained, plus signed checkpoints that detect a *wholesale rewrite*, not merely an edit. |
+| **Process termination** | 🟡 Bounded | `vigil contain --terminate` stops the recorded tree, verifying `(pid, start time, command)` before each signal. Identity rests on a one-second-granularity clock: evidence, not proof. |
+| **Secret use** | 🟡 Bounded | Real Keychain credentials reach `git` without entering `argv`, VIGIL's files, or the event log. HTTP auth and artifact signing are not implemented and fail rather than claiming a use. |
+| **Network** | 🟡 Bounded | Destination policy is enforced for flows routed through the broker. The probe sends no payload. A direct socket is unmediated. |
+| **MCP** | 🟡 Bounded | Traffic through `vigil mcp proxy` is authorized by its *arguments*. An agent that contacts a server directly is not mediated. |
+| **Sandboxing the child** | 🔴 Not enforced | `vigil run` does not confine its child. It keeps the launching user's full ambient authority. |
+| **No self-authorization** | 🔴 Not enforced | No broker *can* reach the grant path — the type it needs cannot be built from broker code, and a test asserts it. But with no `vigild`, an agent runs as the same user and can invoke the CLI itself. **Invariant 3 is not satisfied at the OS level.** |
+| **Reconciliation** | 🔴 No observer | The engine compares two records; nothing produces the second one. Every reconciliation on a real session reports `NO_OBSERVER` and exits non-zero — never "consistent". |
+
+<sub>🟢 enforced for brokered operations · 🟡 real but bounded, limits stated · 🔴 needs the entitled half</sub>
 
 See the [local architecture](docs/architecture/ARCHITECTURE.md),
 [Endpoint Security model](docs/architecture/ENDPOINT_SECURITY_MODEL.md),
@@ -583,19 +621,21 @@ labelled as available.
 
 | | |
 |---|---|
-| **Tests passing** | **709** — 680 Rust, 29 Python |
+| **Tests passing** | **842** — 733 Rust, 80 Swift, 29 Python |
 | **Tests asserting something is *impossible*** | **154** — replay, forgery, mutation, escalation, cross-tenant, impersonation |
 | **Property tests** | algebraic laws over generated inputs, not just examples |
 | **Local decision latency** | 18 µs permitted, 273 µs when a detection fires (Apple M2) |
-| **Rust** | 51,917 lines across 15 crates |
+| **Rust** | 55,353 lines across 15 crates · **Swift** 5,648 lines across 2 adapters |
 | **Python SDK** | 1,364 lines, **zero runtime dependencies** |
 | **Static analysis** | `clippy -D warnings` clean · `#![forbid(unsafe_code)]` in every crate |
 | **Policy** | 30 rules across 6 shipped bundles, tested against the *real* bundles not fixtures |
 | **Protocol** | 82 machine-readable reason codes, 14 trust levels, 12 taint kinds |
 | **Detection quality** | precision 1.000 · recall 0.846 · FPR 0.000 on a held-out corpus with hard negatives |
 | **Failure modes** | the documented fail-closed matrix is mechanically tested, not just written |
+| **Adversarial harness** | 25 threat-model attacks run end to end against a real binary and database |
+| **Local durability** | SQLite schema v13, forward-only migrations, WAL, owner-only permissions |
 | **Decision latency** | p95 0.105 ms · p99 0.107 ms (Apple M2, in-process, excludes network) |
-| **Fuzzing** | 10 property-asserting targets — found real defects |
+| **Fuzzing** | 12 property-asserting targets — found real defects, including one this week |
 | **Cryptography** | Ed25519 capabilities & approvals, SHA-256 hash-chained audit |
 
 Tests are named for what they prove, not what they touch:
@@ -644,7 +684,7 @@ email. Both the engine and the policy were wrong; both were fixed.
 git clone https://github.com/bbrookhart/VIGIL && cd VIGIL
 
 make demo          # blocked-injection + safe-action demonstrations
-make test          # 709 tests, Rust + Python
+make test          # 762 tests, Rust + Python
 make verify        # fmt + clippy -D warnings + full suite  (what CI would run)
 make verify-macos  # portable gates + native Endpoint Security and Network adapter checks
 ```
