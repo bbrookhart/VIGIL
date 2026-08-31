@@ -25,7 +25,7 @@ fn status_reports_secret_interface_without_claiming_native_custody() {
         .expect("read status");
     assert!(output.status.success());
     let status: serde_json::Value = serde_json::from_slice(&output.stdout).expect("status JSON");
-    assert_eq!(status["secret_broker"], "INTERFACE_AND_SIMULATOR_ONLY");
+    assert_eq!(status["secret_broker"], "KEYCHAIN_METADATA_AND_GIT_AUTH");
     assert_eq!(status["endpoint_fast_path"], "SIMULATOR_AVAILABLE");
     assert_eq!(status["endpoint_security"], "NOT INSTALLED");
     assert_eq!(status["os_enforcement"], false);

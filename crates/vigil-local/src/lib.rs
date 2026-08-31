@@ -21,6 +21,7 @@ mod clock;
 mod detection;
 mod git_broker;
 mod incident;
+mod keychain;
 mod lease;
 mod mcp;
 mod mcp_proxy;
@@ -68,6 +69,7 @@ pub use git_broker::{
     DETECTION_GIT_EXECUTABLE_CONFIG, DETECTION_GIT_HISTORY_REWRITE, GIT_RULES,
 };
 pub use incident::{Incident, IncidentResponse, IncidentStatus, ResponseAction, ResponseOutcome};
+pub use keychain::KeychainSecretProvider;
 pub use lease::{
     CapabilityLease, LeaseState, DEFAULT_LEASE_TTL_SECONDS, MAX_LEASE_TTL_SECONDS, MAX_LEASE_USES,
 };
