@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="500" viewBox="0 0 1200 500" role="img" aria-labelledby="title desc">
+  <title id="title">VIGIL enforcement maturity</title><desc id="desc">Portable policy and semantic brokers are implemented and tested; native macOS adapters are implemented and entitlement-free tested; activated host enforcement still needs signed entitled device validation.</desc>
+  <defs><style>.bg{fill:#f8fafc}.line{stroke:#cbd5e1;stroke-width:8}.done{fill:#0f766e}.part{fill:#f59e0b}.next{fill:#fff;stroke:#94a3b8;stroke-width:4}.t{font:600 21px Arial;fill:#102a43}.s{font:14px Arial;fill:#475569}.w{font:700 18px Arial;fill:#fff}</style></defs>
+  <rect class="bg" width="1200" height="500" rx="24"/><text class="t" x="55" y="60">Maturity is reported per enforcement boundary, not as one percentage</text><line class="line" x1="135" y1="215" x2="1065" y2="215"/>
+  <circle class="done" cx="145" cy="215" r="42"/><text class="w" x="132" y="222">1</text><text class="t" x="70" y="300">Policy core</text><text class="s" x="58" y="328">implemented + tested</text>
+  <circle class="done" cx="445" cy="215" r="42"/><text class="w" x="432" y="222">2</text><text class="t" x="348" y="300">Semantic brokers</text><text class="s" x="363" y="328">broker-enforced</text>
+  <circle class="part" cx="755" cy="215" r="42"/><text class="w" x="742" y="222">3</text><text class="t" x="664" y="300">macOS adapters</text><text class="s" x="634" y="328">built + parity-tested</text>
+  <circle class="next" cx="1055" cy="215" r="42"/><text class="t" x="1043" y="222">4</text><text class="t" x="959" y="300">Host activation</text><text class="s" x="937" y="328">signing + entitlements</text><text class="s" x="961" y="350">device evidence</text>
+  <text class="s" x="55" y="430">Current public claim: strong mediation when traffic uses VIGIL; full-process macOS confinement is not yet demonstrated.</text>
+</svg>

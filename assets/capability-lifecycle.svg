@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420" role="img" aria-labelledby="title desc">
+  <title id="title">Bounded approval and capability lifecycle</title><desc id="desc">A request that requires approval is reviewed by a human and becomes a signed, expiring, single-purpose capability consumed by the gateway.</desc>
+  <defs><style>.bg{fill:#f8fafc}.c{fill:#fff;stroke:#cbd5e1;stroke-width:2}.hi{fill:#fff7ed;stroke:#f59e0b;stroke-width:2}.v{fill:#102a43}.t{font:600 19px Arial;fill:#102a43}.s{font:14px Arial;fill:#475569}.w{font:600 19px Arial;fill:#fff}.a{stroke:#64748b;stroke-width:3;fill:none;marker-end:url(#m)}</style><marker id="m" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0L0 6L9 3z" fill="#64748b"/></marker></defs>
+  <rect class="bg" width="1200" height="420" rx="24"/><text class="t" x="55" y="60">Approval does not create ambient authority</text>
+  <rect class="c" x="45" y="135" width="185" height="115" rx="14"/><text class="t" x="72" y="172">Request</text><text class="s" x="72" y="202">exact action +</text><text class="s" x="72" y="223">resolved resource</text>
+  <rect class="hi" x="285" y="135" width="185" height="115" rx="14"/><text class="t" x="312" y="172">Human review</text><text class="s" x="312" y="202">facts · risk ·</text><text class="s" x="312" y="223">use count</text>
+  <rect class="v" x="525" y="115" width="200" height="155" rx="14"/><text class="w" x="560" y="155">Signed lease</text><text class="s" style="fill:#dbeafe" x="555" y="187">action hash · expiry</text><text class="s" style="fill:#dbeafe" x="555" y="210">principal · session</text><text class="s" style="fill:#fbbf24" x="555" y="233">nonce · max uses</text>
+  <rect class="c" x="780" y="135" width="175" height="115" rx="14"/><text class="t" x="810" y="172">Gateway</text><text class="s" x="810" y="202">recompute +</text><text class="s" x="810" y="223">consume</text>
+  <rect class="c" x="1010" y="135" width="145" height="115" rx="14"/><text class="t" x="1035" y="172">Effect</text><text class="s" x="1035" y="202">bounded +</text><text class="s" x="1035" y="223">audited</text>
+  <path class="a" d="M230 192H277"/><path class="a" d="M470 192H517"/><path class="a" d="M725 192H772"/><path class="a" d="M955 192H1002"/>
+  <text class="s" x="55" y="340">Denied requests stay denied. Expired, replayed, mismatched, or exhausted leases fail closed.</text>
+</svg>

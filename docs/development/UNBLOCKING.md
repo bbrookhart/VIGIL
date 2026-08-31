@@ -44,7 +44,8 @@ Either route requires interactive Apple ID sign-in.
   activation lifecycle build under `xcodebuild`. Successfully *activating* one needs a Developer ID signing identity, and
   `security find-identity -v -p codesigning` reports none. An Apple ID alone does not grant one —
   that is step 2.
-- ~~**XCTest targets.**~~ **Done** — both packages now run real XCTest suites (76 tests) instead
+- ~~**XCTest targets.**~~ **Done** — the native packages run real XCTest and Swift Testing suites; the
+  current declaration count is generated in [`docs/generated/evidence.md`](../generated/evidence.md) instead
   of a check executable; see ADR 0039. The port was validated by mutation testing, which found a
   guard the old check had never exercised.
 - The SwiftUI Control Center (Phase 5).

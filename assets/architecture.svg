@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="640" viewBox="0 0 1200 640" role="img" aria-labelledby="title desc">
+  <title id="title">VIGIL runtime architecture</title>
+  <desc id="desc">An agent request crosses provenance, deterministic policy, capability, semantic broker, and operating-system enforcement layers before a side effect.</desc>
+  <defs><style>
+    .bg{fill:#f7f9fc}.card{fill:#fff;stroke:#cbd5e1;stroke-width:2}.core{fill:#102a43}.accent{fill:#f59e0b}.ok{fill:#0f766e}.muted{fill:#64748b}.t{font:600 22px Inter,Arial,sans-serif;fill:#102a43}.s{font:15px Inter,Arial,sans-serif;fill:#475569}.w{font:600 20px Inter,Arial,sans-serif;fill:#fff}.arrow{stroke:#64748b;stroke-width:3;fill:none;marker-end:url(#a)}
+  </style><marker id="a" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#64748b"/></marker></defs>
+  <rect class="bg" width="1200" height="640" rx="24"/>
+  <text class="t" x="60" y="65">Every side effect must carry evidence and bounded authority</text>
+  <rect class="card" x="60" y="115" width="190" height="115" rx="14"/><text class="t" x="90" y="155">Agent intent</text><text class="s" x="90" y="185">tool · file · process</text><text class="s" x="90" y="207">network · secret</text>
+  <rect class="card" x="330" y="115" width="220" height="115" rx="14"/><text class="t" x="360" y="155">Provenance</text><text class="s" x="360" y="185">origin · trust · taint</text><text class="s" x="360" y="207">causal influence</text>
+  <rect class="core" x="630" y="100" width="240" height="145" rx="14"/><text class="w" x="665" y="145">Policy engine</text><text class="s" style="fill:#dbeafe" x="665" y="178">deterministic lattice</text><text class="s" style="fill:#dbeafe" x="665" y="203">fail-closed by impact</text>
+  <rect class="card" x="950" y="115" width="190" height="115" rx="14"/><text class="t" x="980" y="155">Decision</text><text class="s" x="980" y="185">allow · constrain</text><text class="s" x="980" y="207">approve · deny</text>
+  <path class="arrow" d="M250 172H322"/><path class="arrow" d="M550 172H622"/><path class="arrow" d="M870 172H942"/>
+  <rect class="card" x="180" y="340" width="235" height="130" rx="14"/><text class="t" x="210" y="380">Capability</text><text class="s" x="210" y="410">signed · exact action hash</text><text class="s" x="210" y="434">expiry · nonce · use limit</text>
+  <rect class="card" x="485" y="340" width="235" height="130" rx="14"/><text class="t" x="515" y="380">Semantic broker</text><text class="s" x="515" y="410">resolve real resource</text><text class="s" x="515" y="434">budget · execute · audit</text>
+  <rect class="card" x="790" y="340" width="235" height="130" rx="14"/><text class="t" x="820" y="380">OS boundary</text><text class="s" x="820" y="410">Endpoint Security</text><text class="s" x="820" y="434">Network Extension</text>
+  <path class="arrow" d="M1045 230V285H298V332"/><path class="arrow" d="M415 405H477"/><path class="arrow" d="M720 405H782"/>
+  <rect class="ok" x="365" y="535" width="470" height="60" rx="30"/><text class="w" x="447" y="573">Bounded, attributable side effect</text>
+  <path class="arrow" d="M907 470V565H843"/><circle class="accent" cx="1045" cy="285" r="7"/>
+</svg>

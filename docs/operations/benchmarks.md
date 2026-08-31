@@ -152,7 +152,7 @@ transition and an incident — each a `BEGIN IMMEDIATE` on a WAL database.
 
 That cost buys durable evidence, and **it is not a trade worth making**. Batching or deferring
 those writes would mean a session could act on a decision whose record had not landed, which is
-precisely the property `INVARIANTS.md` item 12 exists to prevent. Latency here is paid once per
+precisely the property `../security/SECURITY_INVARIANTS.md` item 12 exists to prevent. Latency here is paid once per
 agent tool call, at LLM pace; a few hundred microseconds is not observable to anyone.
 
 ## What this is not
