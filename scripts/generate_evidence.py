@@ -115,10 +115,11 @@ def render_readme_fragment(values: dict[str, int]) -> str:
     adrs = values["architecture_decisions"]
     crates = values["workspace_crates"]
     unsafe = values["unsafe_code_constructs"]
+    unsafe_label = "zero" if unsafe == 0 else str(unsafe)
     return f"""<!-- evidence:start -->
 The committed inventory currently finds **{rust} Rust test entry points, {swift} Swift test entry
-points, {adversarial} adversarial harness tests, {fuzz} fuzz targets, {adrs} ADRs, {crates}
-workspace crates, and {unsafe} unsafe Rust constructs**. Those are source declarations, not a
+points, {adversarial} adversarial harness tests, {fuzz} fuzz targets, {adrs} ADRs, {crates} workspace
+crates, and {unsafe_label} unsafe Rust constructs**. Those are source declarations, not a
 hand-maintained “passing” count;
 CI supplies execution status and rejects a stale inventory.
 <!-- evidence:end -->"""

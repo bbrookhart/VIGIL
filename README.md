@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://github.com/bbrookhart/VIGIL/actions/workflows/ci.yml"><img src="https://github.com/bbrookhart/VIGIL/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
-  <img src="https://img.shields.io/badge/Rust-1.85%2B-102a43" alt="Rust 1.85 or newer">
+  <img src="https://img.shields.io/badge/Rust-1.88%2B-102a43" alt="Rust 1.88 or newer">
   <img src="https://img.shields.io/badge/macOS-Apple%20Silicon-102a43" alt="Apple Silicon macOS target">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-0f766e" alt="Apache 2.0 license"></a>
 </p>
@@ -38,8 +38,8 @@ enforcement adapters.
 
 <!-- evidence:start -->
 The committed inventory currently finds **734 Rust test entry points, 199 Swift test entry
-points, 25 adversarial harness tests, 12 fuzz targets, 54 ADRs, 15
-workspace crates, and 0 unsafe Rust constructs**. Those are source declarations, not a
+points, 25 adversarial harness tests, 12 fuzz targets, 54 ADRs, 15 workspace
+crates, and zero unsafe Rust constructs**. Those are source declarations, not a
 hand-maintained “passing” count;
 CI supplies execution status and rejects a stale inventory.
 <!-- evidence:end -->
@@ -85,7 +85,7 @@ It uses a disposable directory and demonstrates four paths:
 3. an indirect prompt-injection chain stopped before tool execution;
 4. a human approval that mints one exact, single-use process lease.
 
-Requirements: Rust 1.85+, Python 3.10+, and a Unix-like host. The demo builds locally and does not
+Requirements: Rust 1.88+, Python 3.10+, and a Unix-like host. The demo builds locally and does not
 need a cloud account, Apple entitlement, real secret, or network request.
 
 For a two-minute code review, start with:
@@ -255,6 +255,7 @@ These are release constraints, not footnotes. See [Publication checklist](docs/r
 
 - [Interview guide](docs/portfolio/INTERVIEW_GUIDE.md) — 14 hard design questions with concise answers.
 - [Portfolio summary](docs/portfolio/PORTFOLIO_SUMMARY.md) — one-page project narrative and evidence map.
+- [Five-perspective review](docs/portfolio/RECRUITER_REVIEW.md) — recruiter, security, systems, research and maintenance verdicts.
 - [Architecture](docs/architecture/ARCHITECTURE.md) — implementation-level control flow.
 - [Threat model](docs/threat-model/THREAT_MODEL.md) — assets, adversaries, threats and assumptions.
 - [Operations](docs/operations/INSTALLATION.md) — deployment and operating guidance.

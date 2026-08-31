@@ -332,7 +332,9 @@ final class XPCSlowServer: @unchecked Sendable {
             usleep(200_000)
             let response = Data("{}".utf8)
             response.withUnsafeBytes { bytes in
-                xpc_dictionary_set_data(reply, "response", bytes.baseAddress, bytes.count)
+                if let baseAddress = bytes.baseAddress {
+                    xpc_dictionary_set_data(reply, "response", baseAddress, bytes.count)
+                }
             }
             xpc_connection_send_message(peer.connection, reply)
         }
