@@ -10,6 +10,7 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
+use vigil_common::canonical::canonicalize;
 use vigil_local::McpToolManifest;
 
 fuzz_target!(|data: &[u8]| {
@@ -17,6 +18,17 @@ fuzz_target!(|data: &[u8]| {
         // Refusing malformed input is correct behaviour, not a finding.
         return;
     };
+
+    // Deserialization is not the system's acceptance boundary. Before a manifest can establish
+    // a baseline, each schema is canonicalized and hashed; numerics that do not survive JSON
+    // round trips (or require cross-language-ambiguous exponent notation) are refused there.
+    // Mirror that boundary so the property applies only to manifests VIGIL would record.
+    if manifests
+        .iter()
+        .any(|manifest| canonicalize(&manifest.input_schema).is_err())
+    {
+        return;
+    }
 
     // Whatever was accepted must survive a round trip unchanged. The stored baseline is
     // derived from this value, and a lossy round trip would mean the recorded baseline is not

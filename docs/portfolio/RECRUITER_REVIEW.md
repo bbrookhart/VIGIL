@@ -26,7 +26,10 @@ activated enforcement. Static “passing” counts are gone; source declarations
 is the execution record. Code fixes strengthen executable identity and SDK transport validation.
 A fresh candidate fuzz run then found that malformed trailing bytes could turn an unset Keychain
 attribute into a present kind; the parser now fails closed and the reproducer is committed. That
-finding-and-repair loop is stronger evidence than a static test-count claim.
+finding-and-repair loop is stronger evidence than a static test-count claim. A later MCP-manifest
+fuzz case exposed a harness mismatch: an unstable exponent-form number round-tripped lossily, but
+the real baseline path already refused it during canonical hashing. The harness now mirrors that
+acceptance boundary, and an actual-store regression proves the rejected schema is never recorded.
 
 **Residual risk:** same-user approval/storage and missing signed-entitled device evidence remain the
 dominant trust-boundary gaps. A full-history secret scan and independent review are still required

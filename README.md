@@ -37,7 +37,7 @@ enforcement adapters.
 | Where is the proof? | [Generated source inventory](docs/generated/evidence.md), [CI](https://github.com/bbrookhart/VIGIL/actions/workflows/ci.yml), [evaluation framework](docs/evaluation/EVALUATION_FRAMEWORK.md), [ADRs](docs/adr/), and [benchmark method](docs/evaluation/BENCHMARK_METHOD.md). |
 
 <!-- evidence:start -->
-The committed inventory currently finds **735 Rust test entry points, 199 Swift test entry
+The committed inventory currently finds **736 Rust test entry points, 199 Swift test entry
 points, 25 adversarial harness tests, 12 fuzz targets, 54 ADRs, 15 workspace
 crates, and zero unsafe Rust constructs**. Those are source declarations, not a
 hand-maintained “passing” count;

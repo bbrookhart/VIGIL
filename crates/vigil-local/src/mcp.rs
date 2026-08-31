@@ -1657,6 +1657,24 @@ mod tests {
     }
 
     #[test]
+    fn an_unstable_numeric_schema_is_refused_before_it_can_become_a_baseline() {
+        let (root, store, _session, _workspace) = active_session();
+        register_test_server(&store, "unstable-schema");
+        let manifests: Vec<McpToolManifest> =
+            serde_json::from_str("[[\"calculate\",\"\",[2e-066]]]").expect("parse wire manifest");
+
+        let error = store
+            .sync_mcp_tools("unstable-schema", None, &manifests)
+            .expect_err("an unstable schema must fail before baseline insertion");
+        assert!(format!("{error}").contains("exponent"), "{error}");
+        assert!(
+            store.mcp_tools("unstable-schema").expect("stored tools").is_empty(),
+            "a refused schema reached the trusted baseline"
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn every_shape_of_drift_is_reported_after_the_baseline() {
         let (root, store, _session, _workspace) = active_session();
         register_test_server(&store, "filesystem");
