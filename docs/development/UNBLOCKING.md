@@ -9,12 +9,13 @@ Full Xcode ───────────────────────
   free, immediate
 
 Developer Program ($99/yr) ─┬───────────────► signing, notarization  (Phase 9)
-  days; longer for an org   └── prerequisite ─► both entitlement requests
-                                                        │
+  same day as an individual; └── prerequisite ─► both entitlement requests
+  +5 business days for D-U-N-S                          │
                                                         ▼
                               ES entitlement ──────────► Phase 3 ships
                               NE entitlement ──────────► Phase 4 ships
-                                discretionary Apple review
+                                discretionary; reports of 4-12 months
+                                with no response. May never arrive.
 
 Disposable VM ──────────────────────────────► Phase 3 *validated* today
   free, needs neither of the above
@@ -52,9 +53,15 @@ Either route requires interactive Apple ID sign-in.
 
 Start this first even though Xcode is the quicker win, because it has the longest lead time.
 
-Expect to need an **Organization** account rather than Individual for Endpoint Security, which
-means a D-U-N-S number and a legal entity. Unblocks Developer ID signing, notarization, and
-provisioning profiles, and is a hard prerequisite for both entitlement requests.
+Unblocks Developer ID signing, notarization, and provisioning profiles, and is a hard
+prerequisite for both entitlement requests. Note that an Apple ID alone is *not* enough:
+`security find-identity -v -p codesigning` reports no identities until you are enrolled.
+
+`APPLE_APPLICATION_PACK.md` §2 covers the Individual-versus-Organization decision, and §3 has
+drafted justifications ready to paste into the request form. Two things worth knowing before
+you plan around this: entitlement approval is discretionary with no SLA and public reports of
+4-12 month waits, and **development and distribution are granted separately** — ask for
+development first, which is what Phase 3 actually needs.
 
 ## 3. The entitlement requests
 
@@ -69,6 +76,11 @@ demonstrated behaviour rather than intent.
 
 This is the step worth doing first, because it converts Phase 3 from "compiles" to "demonstrated"
 and needs neither Xcode nor an entitlement.
+
+> **Check `APPLE_APPLICATION_PACK.md` §4 before starting this.** On the current machine the VM
+> does not fit — 28.4 GB free against ~60 GB needed, and 8 GB RAM against a guest wanting 4-8 —
+> and there is an unverified caveat about whether SIP-disable takes effect in an Apple Silicon
+> guest at all. That section lists the cheapest way to find out before committing time.
 
 Stand up a **disposable macOS VM** — Virtualization.framework, UTM, or Tart on Apple Silicon —
 and on that VM only:
@@ -125,7 +137,8 @@ not a test to relax.
 
 ## 6. Order
 
-1. **Today** — start the Developer Program organization application. Longest lead time, blocks the most.
+1. **Today** — decide Individual vs Organization and enrol (`APPLE_APPLICATION_PACK.md` §2). If
+   Organization, request the D-U-N-S number first: longest lead time, costs nothing.
 2. **Today** — free ~50 GB and install Xcode. Then bundle targets, XCTest, Phase 5.
 3. **This week** — disposable VM, run the table in §4, record each result against its ADR.
 4. **On membership** — submit both entitlement requests, citing the §4 results.

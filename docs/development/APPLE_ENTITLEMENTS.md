@@ -40,7 +40,8 @@ real System Extension bundle, containing app, activation request, generated prov
 code-signing validation, and XCTest target cannot be created or tested here. Those artifacts must
 come from the matching full-Xcode templates and be reviewed rather than guessed.
 
-`UNBLOCKING.md` records the dependency order for obtaining these, and the disposable-VM
+`APPLE_APPLICATION_PACK.md` holds the enrolment decision and drafted request
+justifications; `UNBLOCKING.md` records the dependency order for obtaining these, and the disposable-VM
 development path that validates the Endpoint Security exit criteria without an entitlement. That
 path is for a throwaway developer machine only; nothing in the shipped product may depend on it,
 and the release gates that assert the truthful posture must keep passing unchanged while it is
