@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use vigil_common::{Result, VigilError};
 
-const SCHEMA_VERSION: i64 = 12;
+const SCHEMA_VERSION: i64 = 13;
 
 /// How long a workspace remembers that a session on it was contained.
 ///
@@ -1362,6 +1362,22 @@ impl LocalStore {
                 )
                 .map_err(storage_error)?;
         }
+        if self.schema_version()? < 13 {
+            // A PID is not an identity: the kernel reuses it. Recording the operating
+            // system's start time at spawn is what lets termination later tell "the process
+            // VIGIL launched" from "whatever holds that number now" (ADR 0041). Nullable,
+            // because rows written before this existed cannot be back-filled - and a node
+            // with no recorded start time is never signalled.
+            self.connection
+                .execute_batch(
+                    "BEGIN IMMEDIATE;
+                     ALTER TABLE processes ADD COLUMN os_started_at TEXT;
+                     ALTER TABLE processes ADD COLUMN os_executable TEXT;
+                     PRAGMA user_version = 13;
+                     COMMIT;",
+                )
+                .map_err(storage_error)?;
+        }
         let version = self.schema_version()?;
         if version != SCHEMA_VERSION {
             return Err(VigilError::Config(format!(
@@ -2236,6 +2252,8 @@ mod tests {
                  DROP TABLE detections;
                  ALTER TABLE events DROP COLUMN chain_hash;
                  ALTER TABLE events DROP COLUMN previous_hash;
+                 ALTER TABLE processes DROP COLUMN os_started_at;
+                 ALTER TABLE processes DROP COLUMN os_executable;
                  DROP TABLE IF EXISTS chain_checkpoints;
                  PRAGMA user_version = 4;",
             )
