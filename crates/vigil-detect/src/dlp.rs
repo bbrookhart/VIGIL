@@ -285,7 +285,7 @@ fn is_probable_card(candidate: &str) -> bool {
         }
         sum += v;
     }
-    sum % 10 == 0
+    sum.is_multiple_of(10)
 }
 
 /// Shannon entropy in bits per character.
