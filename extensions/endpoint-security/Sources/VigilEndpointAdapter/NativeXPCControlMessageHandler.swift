@@ -87,12 +87,14 @@ public final class NativeXPCControlMessageHandler: @unchecked Sendable {
 
     private static func attach(response: Data, to reply: xpc_object_t) -> xpc_object_t {
         response.withUnsafeBytes { bytes in
-            xpc_dictionary_set_data(
-                reply,
-                xpcControlResponseKey,
-                bytes.baseAddress,
-                bytes.count
-            )
+            if let baseAddress = bytes.baseAddress {
+                xpc_dictionary_set_data(
+                    reply,
+                    xpcControlResponseKey,
+                    baseAddress,
+                    bytes.count
+                )
+            }
         }
         return reply
     }

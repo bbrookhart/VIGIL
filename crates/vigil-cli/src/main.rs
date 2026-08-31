@@ -5,6 +5,8 @@
 //! `incident export` — are deliberately absent rather than present and stubbed: a CLI that
 //! prints "not yet implemented" teaches operators to distrust its output.
 
+#![forbid(unsafe_code)]
+
 use clap::{Parser, Subcommand};
 use std::collections::{BTreeMap, HashMap};
 use std::ffi::OsString;

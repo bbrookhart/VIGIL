@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,6 +32,9 @@ request = ActionRequest(
     session_id="sess-1",
     agent_id="customer-support-assistant",
     agent_instance_id="inst-1",
+    # Contract fixtures must be reproducible. Runtime requests still default to the current
+    # UTC time; only this committed cross-language specimen is fixed.
+    occurred_at=datetime.fromisoformat("2026-08-15T16:18:47.059249+00:00"),
     principal=Principal(
         id="user-1", kind="human", tenant_id="acme", roles=["support-agent"], mfa=True
     ),

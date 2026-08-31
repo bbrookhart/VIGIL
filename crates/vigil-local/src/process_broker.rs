@@ -567,22 +567,22 @@ fn identify_executable(path: &Path) -> Result<ExecutableIdentity> {
 /// A path that can no longer be read counts as changed: it is certainly not the object that
 /// was checked.
 fn executable_unchanged(path: &Path, expected: &ExecutableIdentity) -> bool {
-    let Some(expected) = expected.object else {
-        // Nothing to compare on this platform.
-        return true;
+    let Ok(observed) = identify_executable(path) else {
+        return false;
     };
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::MetadataExt;
-        std::fs::symlink_metadata(path)
-            .map(|metadata| (metadata.dev(), metadata.ino()) == expected)
-            .unwrap_or(false)
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = (path, expected);
-        true
-    }
+
+    // Device/inode narrows a path-swap race, but filesystems may reuse an inode immediately
+    // after unlink. When content was small enough to hash during validation, require the hash
+    // too. On platforms without a stable object identifier the hash is the only evidence.
+    let object_matches = match expected.object {
+        Some(object) => observed.object == Some(object),
+        None => true,
+    };
+    let content_matches = match &expected.sha256 {
+        Some(sha256) => observed.sha256.as_ref() == Some(sha256),
+        None => true,
+    };
+    object_matches && content_matches
 }
 
 fn validate_request(request: &ProcessRequest, workspace: &Path) -> Result<ValidatedRequest> {

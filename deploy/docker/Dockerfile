@@ -5,13 +5,14 @@
 # to limit what an attacker can do next is to ship nothing for them to use.
 
 # ---------------------------------------------------------------- build
-FROM rust:1.82-slim-bookworm AS build
+FROM rust:1.85-slim-bookworm AS build
 
 WORKDIR /src
 
 # Dependency layer first, so a source-only change does not rebuild the world.
 COPY Cargo.toml Cargo.lock ./
 COPY crates/ crates/
+COPY policies/ policies/
 RUN cargo build --release --locked \
       --bin vigil-core --bin vigil-gateway --bin vigil \
  && strip target/release/vigil-core target/release/vigil-gateway target/release/vigil
@@ -40,4 +41,4 @@ ENTRYPOINT ["/usr/local/bin/vigil-core"]
 LABEL org.opencontainers.image.title="VIGIL" \
       org.opencontainers.image.description="Runtime security for autonomous AI agents" \
       org.opencontainers.image.licenses="Apache-2.0" \
-      org.opencontainers.image.source="https://github.com/vigil-security/vigil"
+      org.opencontainers.image.source="https://github.com/bbrookhart/VIGIL"

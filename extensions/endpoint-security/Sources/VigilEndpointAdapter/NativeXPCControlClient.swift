@@ -140,7 +140,9 @@ public final class NativeXPCControlClient: @unchecked Sendable {
 
         let message = xpc_dictionary_create_empty()
         requestData.withUnsafeBytes { bytes in
-            xpc_dictionary_set_data(message, "request", bytes.baseAddress, bytes.count)
+            if let baseAddress = bytes.baseAddress {
+                xpc_dictionary_set_data(message, "request", baseAddress, bytes.count)
+            }
         }
         xpc_connection_send_message_with_reply(connection, message, queue) { [weak self] reply in
             self?.receive(reply, requestID: requestID)

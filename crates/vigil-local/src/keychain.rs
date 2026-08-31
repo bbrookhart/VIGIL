@@ -413,13 +413,16 @@ fn set_executable_owner_only(path: &Path) -> Result<()> {
 mod tests {
     use super::*;
 
+    #[cfg(target_os = "macos")]
     const SECRET: &str = "SUPERSECRET-do-not-disclose-42";
 
     /// A throwaway keychain, so tests never touch the user's login keychain and never prompt.
+    #[cfg(target_os = "macos")]
     struct TestKeychain {
         path: PathBuf,
     }
 
+    #[cfg(target_os = "macos")]
     impl TestKeychain {
         fn new() -> Self {
             let path = std::env::temp_dir().join(format!(
@@ -460,6 +463,7 @@ mod tests {
         }
     }
 
+    #[cfg(target_os = "macos")]
     impl Drop for TestKeychain {
         fn drop(&mut self) {
             let _ = Command::new(SECURITY_PATH)
@@ -472,6 +476,7 @@ mod tests {
         }
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn metadata_never_carries_the_secret() {
         // The property the whole provider exists for. `metadata` is what an agent's questions
@@ -498,6 +503,7 @@ mod tests {
         );
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn the_raw_security_lookup_used_for_metadata_does_not_return_the_secret() {
         // Guards the flag, not just the parse. Adding `-w` to the metadata path would make
@@ -515,6 +521,7 @@ mod tests {
         );
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn kinds_map_to_fixed_purposes() {
         // Purposes are derived from the kind, never read from the item, so a Keychain entry
@@ -536,6 +543,7 @@ mod tests {
             .contains(&SecretUsePurpose::GitAuthentication));
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn an_absent_handle_is_not_found() {
         let keychain = TestKeychain::new();
@@ -546,6 +554,7 @@ mod tests {
         assert!(matches!(error, VigilError::NotFound(_)), "{error:?}");
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn an_item_without_a_vigil_kind_is_refused() {
         // An arbitrary Keychain item the user happens to have is not a VIGIL secret. Guessing
@@ -575,6 +584,7 @@ mod tests {
         assert!(format!("{error}").contains("secret kind"), "{error}");
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn a_purpose_the_kind_does_not_support_is_refused_before_any_use() {
         // Defence in depth behind the broker's grant check: a signing key pressed into
@@ -593,6 +603,7 @@ mod tests {
         assert!(format!("{error}").contains("cannot be used for"), "{error}");
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn unimplemented_purposes_fail_rather_than_reporting_a_use_that_did_not_happen() {
         let keychain = TestKeychain::new();
@@ -609,6 +620,7 @@ mod tests {
         assert!(format!("{error}").contains("not implemented"), "{error}");
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn the_askpass_helper_contains_the_lookup_and_never_the_secret() {
         // The helper is written to disk, so what it contains matters: it must carry the
@@ -637,6 +649,7 @@ mod tests {
         assert!(script.contains("find-generic-password"));
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn a_crafted_description_cannot_forge_the_secret_kind() {
         // The kind is read out of an attribute dump that also carries fields whoever created
