@@ -12,6 +12,7 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+**/.build/
 
 # Node (console, TypeScript SDK — not yet built)
 node_modules/

@@ -1,0 +1,13 @@
+{
+  "verification_time_unix_ms": 1800000000000,
+  "expected_instance_id": "network-instance-fixture",
+  "trusted_key_id": "network-fixture-k1",
+  "trusted_public_key": "_RckOFqgx1tk-3jNYC-h2ZH96_drE8WO1wLqyDXp9hg",
+  "envelope": {
+    "format": "vigil.signed-envelope/v1",
+    "algorithm": "Ed25519",
+    "key_id": "network-fixture-k1",
+    "payload": "eyJhdHRyaWJ1dGlvbnMiOlt7InByb2Nlc3MiOls1LDUsNSw1LDUsNSw1LDUsNSw1LDUsNSw1LDUsNSw1LDUsNSw1LDUsNSw1LDUsNSw1LDUsNSw1LDUsNSw1LDVdLCJzZXNzaW9uX2lkIjoic2Vzc2lvbi1uZXR3b3JrLWZpeHR1cmUtMSJ9XSwiZXhwaXJlc19hdF91bml4X21zIjoxODAwMDAwMDYwMDAwLCJnZW5lcmF0aW9uIjoxMiwiaXNzdWVkX2F0X3VuaXhfbXMiOjE3OTk5OTk5OTkwMDAsInNjaGVtYV92ZXJzaW9uIjoidmlnaWwubmV0d29yay1wb2xpY3kvdjEiLCJzZXNzaW9ucyI6eyJzZXNzaW9uLW5ldHdvcmstZml4dHVyZS0xIjp7ImRlc3RpbmF0aW9ucyI6W3siaG9zdG5hbWUiOiJnaXRodWIuY29tIiwicG9ydHMiOls0NDNdLCJwcm90b2NvbCI6InRjcCIsInJlc29sdmVkX2FkZHJlc3NlcyI6WyIxNDAuODIuMTEyLjQiLCIyNjA2OjUwYzA6ODAwMDo6MTU0Il0sInZhbGlkX3VudGlsX3VuaXhfbXMiOjE4MDAwMDAwNjAwMDB9XSwibWF4X2Rpc3RpbmN0X2Rlc3RpbmF0aW9ucyI6MiwibWF4X3RvdGFsX2Zsb3dzIjo0LCJtb2RlIjoiZW5mb3JjZSIsInNlc3Npb25faWQiOiJzZXNzaW9uLW5ldHdvcmstZml4dHVyZS0xIn19LCJ0YXJnZXRfaW5zdGFuY2VfaWQiOiJuZXR3b3JrLWluc3RhbmNlLWZpeHR1cmUifQ",
+    "signature": "UwOFMg_GsucFMsaWb6yd7tYybP98hPZv659IQ-oH4CkxvH3TV8NtAvH3SwuJI_8k1_HQIWG2O-8UKwis9KoQCA"
+  }
+}

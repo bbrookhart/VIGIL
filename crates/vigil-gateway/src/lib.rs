@@ -362,8 +362,21 @@ fn enforce_constraints(
             }
             Constraint::PathRoots { roots } => {
                 if let vigil_protocol::action::Action::File(f) = &request.action {
+                    // Lexical first: cheap, and it answers identically everywhere including
+                    // where no filesystem is reachable.
                     if !vigil_common::path::is_inside_any(&f.path, roots) {
                         return Err("path is outside the capability's permitted roots".to_string());
+                    }
+                    // Then the real filesystem. A lexical check cannot see through a symlink,
+                    // so `/workspace/link -> /etc` followed by `/workspace/link/passwd` passes
+                    // the test above while landing outside the root. This can only add a
+                    // denial: a path already rejected above never reaches here.
+                    if vigil_common::path::is_inside_any_resolved(&f.path, roots)
+                        == vigil_common::path::Containment::Outside
+                    {
+                        return Err(
+                            "path resolves outside the capability's permitted roots".to_string()
+                        );
                     }
                 }
             }
@@ -374,4 +387,147 @@ fn enforce_constraints(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod path_constraint_tests {
+    use super::*;
+    use vigil_common::ids::{
+        AgentId, AgentInstanceId, EnvironmentId, EventId, PrincipalId, SessionId, TenantId,
+    };
+    use vigil_protocol::action::{Action, ActionRequest, FileOperation};
+    use vigil_protocol::principal::{Principal, PrincipalKind};
+
+    /// A workspace containing `link`, a symlink to a directory outside it.
+    struct Workspace {
+        root: std::path::PathBuf,
+        workspace: std::path::PathBuf,
+    }
+
+    impl Workspace {
+        fn new() -> Self {
+            let root = std::env::temp_dir().join(format!(
+                "vigil-gw-path-{}-{:?}",
+                std::process::id(),
+                std::thread::current().id()
+            ));
+            let workspace = root.join("workspace");
+            let outside = root.join("outside");
+            std::fs::create_dir_all(&workspace).expect("workspace");
+            std::fs::create_dir_all(&outside).expect("outside");
+            std::fs::write(outside.join("secret.txt"), "SENSITIVE").expect("secret");
+            std::fs::write(workspace.join("ok.txt"), "fine").expect("ok");
+            std::os::unix::fs::symlink(&outside, workspace.join("link")).expect("symlink");
+            Self { root, workspace }
+        }
+
+        fn constraint(&self) -> Constraint {
+            Constraint::PathRoots {
+                roots: vec![self.workspace.display().to_string()],
+            }
+        }
+
+        fn read(&self, relative: &str) -> ActionRequest {
+            file_request(&self.workspace.join(relative).display().to_string())
+        }
+    }
+
+    impl Drop for Workspace {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.root);
+        }
+    }
+
+    fn file_request(path: &str) -> ActionRequest {
+        ActionRequest {
+            schema_version: vigil_protocol::SCHEMA_VERSION.to_string(),
+            request_id: EventId::new_random(),
+            occurred_at: vigil_common::Timestamp::default(),
+            tenant_id: TenantId::new("acme").expect("id"),
+            environment_id: EnvironmentId::new("prod").expect("id"),
+            session_id: SessionId::new("sess-1").expect("id"),
+            agent_id: AgentId::new("agent").expect("id"),
+            agent_instance_id: AgentInstanceId::new("inst-1").expect("id"),
+            principal: Principal::new(
+                PrincipalId::new("user-1").expect("id"),
+                PrincipalKind::Human,
+                TenantId::new("acme").expect("id"),
+            ),
+            workload_identity: None,
+            trace: Default::default(),
+            action: Action::File(FileOperation {
+                operation: "read".to_string(),
+                path: path.to_string(),
+                content: None,
+                mode: None,
+            }),
+            context: Default::default(),
+        }
+    }
+
+    #[test]
+    fn a_path_inside_the_root_is_permitted() {
+        let workspace = Workspace::new();
+        assert!(enforce_constraints(&[workspace.constraint()], &workspace.read("ok.txt")).is_ok());
+    }
+
+    #[test]
+    fn a_lexically_outside_path_is_refused() {
+        let workspace = Workspace::new();
+        let error = enforce_constraints(&[workspace.constraint()], &file_request("/etc/passwd"))
+            .expect_err("must refuse");
+        assert!(
+            error.contains("outside the capability's permitted roots"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn a_symlink_out_of_the_root_is_refused() {
+        // The escape the threat model recorded as open: `/workspace/link -> /outside`, so
+        // `/workspace/link/secret.txt` is lexically inside the root and really outside it.
+        // Lexical normalization is a string operation and cannot see this; the decision must
+        // not rest on it alone.
+        let workspace = Workspace::new();
+        let request = workspace.read("link/secret.txt");
+
+        assert!(
+            vigil_common::path::is_inside_any(
+                &workspace
+                    .workspace
+                    .join("link/secret.txt")
+                    .display()
+                    .to_string(),
+                &[workspace.workspace.display().to_string()],
+            ),
+            "the lexical check was expected to be fooled; this test proves the other one works"
+        );
+
+        let error = enforce_constraints(&[workspace.constraint()], &request)
+            .expect_err("symlink escape must be refused");
+        assert!(error.contains("resolves outside"), "{error}");
+    }
+
+    #[test]
+    fn a_write_through_a_symlink_to_a_file_that_does_not_exist_is_refused() {
+        // A create is judged before the leaf exists. The escape is in the ancestor.
+        let workspace = Workspace::new();
+        let error = enforce_constraints(
+            &[workspace.constraint()],
+            &workspace.read("link/brand-new.txt"),
+        )
+        .expect_err("must refuse");
+        assert!(error.contains("resolves outside"), "{error}");
+    }
+
+    #[test]
+    fn a_new_file_directly_in_the_workspace_is_permitted() {
+        // The resolution must not deny ordinary creates, which is the way a containment
+        // check most easily becomes useless: by denying everything.
+        let workspace = Workspace::new();
+        assert!(
+            enforce_constraints(&[workspace.constraint()], &workspace.read("brand-new.txt"))
+                .is_ok()
+        );
+    }
 }

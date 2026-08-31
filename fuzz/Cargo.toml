@@ -9,6 +9,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
+serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 vigil-audit = { path = "../crates/vigil-audit" }
@@ -17,6 +18,7 @@ vigil-common = { path = "../crates/vigil-common" }
 vigil-detect = { path = "../crates/vigil-detect" }
 vigil-policy = { path = "../crates/vigil-policy" }
 vigil-protocol = { path = "../crates/vigil-protocol" }
+vigil-local = { path = "../crates/vigil-local" }
 vigil-remit = { path = "../crates/vigil-remit" }
 
 # Fuzz targets are their own workspace so `cargo test --workspace` does not try to build
@@ -59,5 +61,41 @@ doc = false
 [[bin]]
 name = "action_request"
 path = "fuzz_targets/action_request.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "mcp_extract_resources"
+path = "fuzz_targets/mcp_extract_resources.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "mcp_tool_manifest"
+path = "fuzz_targets/mcp_tool_manifest.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "git_remote_host"
+path = "fuzz_targets/git_remote_host.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "reconcile_observations"
+path = "fuzz_targets/reconcile_observations.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "ps_process_identity"
+path = "fuzz_targets/ps_process_identity.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "keychain_attributes"
+path = "fuzz_targets/keychain_attributes.rs"
 test = false
 doc = false
