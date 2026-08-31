@@ -27,6 +27,7 @@ mod mcp_proxy;
 mod network_broker;
 mod policy;
 mod process_broker;
+mod process_identity;
 mod provenance;
 mod reconcile;
 mod risk;
@@ -34,6 +35,7 @@ mod rollback;
 mod secret_broker;
 mod sequence;
 mod store;
+mod terminate;
 
 pub use approval::{
     fingerprint, ApprovalOutcome, ApprovalRequest, ApprovalStatus, ApproverIdentity, CapabilityAsk,
@@ -90,8 +92,9 @@ pub use policy::{
     LeaseStatus, LocalAction, LocalDecision, LocalProfile, LocalRequest, RiskState,
 };
 pub use process_broker::{ProcessBroker, ProcessBrokerResult, ProcessRequest};
+pub use process_identity::{identify, ProcessIdentity};
 pub use provenance::{
-    ProcessEdge, ProcessGraph, ProcessNode, ProcessStatus, MAX_PROCESS_GENERATION,
+    NewProcess, ProcessEdge, ProcessGraph, ProcessNode, ProcessStatus, MAX_PROCESS_GENERATION,
 };
 pub use reconcile::{
     reconcile, Coverage, DeclaredIntent, Mismatch, MismatchClass, ObservedKind, ObservedOperation,
@@ -120,3 +123,4 @@ pub use store::{
     ChainFailure, ChainVerification, LocalEvent, LocalSession, LocalStore, NewSession,
     SessionStatus,
 };
+pub use terminate::{TerminationOutcome, TerminationRecord, TerminationReport};

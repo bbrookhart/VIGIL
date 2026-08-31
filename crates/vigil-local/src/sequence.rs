@@ -756,6 +756,8 @@ mod tests {
             generation: 0,
             exit_code: None,
             status: crate::ProcessStatus::Running,
+            os_started_at: None,
+            os_executable: None,
         }
     }
 

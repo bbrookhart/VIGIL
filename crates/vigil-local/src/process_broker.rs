@@ -5,6 +5,7 @@
 //! No shell string is accepted. This broker does not sandbox the spawned process or prevent a
 //! process from bypassing VIGIL; Endpoint Security remains the required OS enforcement point.
 
+use crate::provenance::NewProcess;
 use crate::{
     classify_executable, evaluate_process, BudgetCharge, BudgetDimension, DecisionOutcome,
     ExecutableClass, LocalAction, LocalProfile, LocalSession, LocalStore, ProcessStatus,
@@ -249,14 +250,20 @@ impl<'a> ProcessBroker<'a> {
             }
         };
         let pid = child.id();
-        let node = match self.store.record_process_start(
+        // Read the kernel's start time while the child handle is still held: until it is
+        // reaped the PID cannot be reused, so this identity is unambiguously the process
+        // just spawned. A failure to read it is recorded as absence, which makes the node
+        // unsignallable rather than mis-signallable.
+        let observed = crate::process_identity::identify(pid).ok().flatten();
+        let node = match self.store.record_process_start(&NewProcess {
             session_id,
-            None,
+            parent_node_id: None,
             pid,
-            &executable_key,
-            &request.arguments,
-            validated.identity.sha256.as_deref(),
-        ) {
+            executable: &executable_key,
+            argv: &request.arguments,
+            executable_sha256: validated.identity.sha256.as_deref(),
+            observed: observed.as_ref(),
+        }) {
             Ok(node) => node,
             Err(error) => {
                 terminate_child(&mut child);

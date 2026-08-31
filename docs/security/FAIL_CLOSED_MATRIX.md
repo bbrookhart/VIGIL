@@ -82,7 +82,7 @@ These rows describe the current state of this repository, not a hypothetical out
 | Network Extension (**not installed**) | The network broker probes payload-free and enforces destination policy only for requests routed through it. Direct sockets are unaffected. | Unaffected |
 | `vigild` and authenticated IPC (**not built**) | Approvals, leases and risk are enforced in-process. Invariant 3 is not satisfied at the OS level: see ADR 0017. | Unaffected |
 | Native Keychain secret provider (**not built**) | The secret broker reports `INTERFACE_AND_SIMULATOR_ONLY` and has no CLI use path. | Unaffected |
-| OS-verified process identity (**not available**) | `vigil contain` withholds authority and revokes leases but terminates nothing. A process already running is unaffected. | Unaffected |
+| OS-verified process identity (**not available**) | `vigil contain --terminate` stops the recorded process tree, verifying `(pid, start time, command)` immediately before each signal and refusing where it no longer matches (ADR 0041). Identity rests on a one-second-granularity start time, so it is evidence rather than proof; a process that escaped attribution is not in the graph and is not stopped. | Unaffected |
 | OS observer for reconciliation (**not installed**) | Every reconciliation on a real session reports `NO_OBSERVER`. The engine works; nothing feeds it. | Unaffected |
 | Rollback for non-brokered writes (**impossible**) | Not covered and reported as not covered. VIGIL never held those bytes; observing a write does not recover its predecessor. | Unaffected |
 | MCP transport is contacted outside the proxy | Direct traffic is unmediated. Traffic routed through `vigil mcp proxy` receives argument authorization and live drift checks. | Unaffected |

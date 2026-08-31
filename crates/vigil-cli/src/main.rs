@@ -159,6 +159,13 @@ enum Command {
         /// End the session after containing it.
         #[arg(long)]
         seal: bool,
+        /// Also stop every live process attributed to the session.
+        ///
+        /// Deepest generation first, and only where the PID still names the process VIGIL
+        /// recorded. A process whose identity no longer matches is left running and
+        /// reported: killing the wrong process is worse than not containing an agent.
+        #[arg(long)]
+        terminate: bool,
         #[arg(long)]
         json: bool,
     },
@@ -882,8 +889,16 @@ fn run(cli: Cli) -> vigil_common::Result<()> {
             session,
             quarantine,
             seal,
+            terminate,
             json,
-        } => contain_session(state_db.as_deref(), &session, quarantine, seal, json),
+        } => contain_session(
+            state_db.as_deref(),
+            &session,
+            quarantine,
+            seal,
+            terminate,
+            json,
+        ),
         Command::Simulate {
             profile,
             workspace,
@@ -2357,14 +2372,19 @@ fn seal_incident(
 
 /// Apply containment responses to a session.
 ///
-/// Deliberately not named `kill`: nothing here terminates a process. Confirming that a PID
-/// still belongs to the process VIGIL recorded needs an OS-verified process identity this
-/// build does not have, and killing the wrong process is worse than not containing an agent.
+/// Without `--terminate` this withholds authority only: leases are revoked and brokered
+/// requests are denied, but a process already running is untouched.
+///
+/// With `--terminate` the session's process tree is stopped as well, deepest generation
+/// first, and only where a PID still names the process VIGIL recorded. That identity is
+/// evidence, not proof — it rests on the kernel's start time rather than on an OS-verified
+/// process identity, which needs Endpoint Security (ADR 0041).
 fn contain_session(
     state_db: Option<&Path>,
     session_id: &str,
     quarantine: bool,
     seal: bool,
+    terminate: bool,
     json: bool,
 ) -> vigil_common::Result<()> {
     use vigil_local::ResponseAction;
@@ -2390,6 +2410,11 @@ fn contain_session(
             ResponseAction::RestrictSession
         },
     ];
+    if terminate {
+        // Before sealing: sealing ends the session, and the tree should be stopped while the
+        // session is still the thing being contained.
+        actions.push(ResponseAction::TerminateProcessTree);
+    }
     if seal {
         actions.push(ResponseAction::SealSession);
     }
@@ -2404,7 +2429,7 @@ fn contain_session(
             serde_json::to_string_pretty(&serde_json::json!({
                 "incident_id": incident.incident_id,
                 "responses": applied,
-                "process_termination": "not performed",
+                "process_termination": if terminate { "attempted" } else { "not performed" },
             }))?
         );
         return Ok(());
@@ -2418,10 +2443,41 @@ fn contain_session(
         );
     }
     println!();
-    println!(
-        "No process was terminated. Containment withholds authority from brokered requests; a \
-         process that bypasses the brokers is unaffected."
-    );
+    if terminate {
+        let termination = applied
+            .iter()
+            .find(|response| response.action == ResponseAction::TerminateProcessTree);
+        if let Some(response) = termination {
+            let terminated = response.detail["terminated"].as_u64().unwrap_or(0);
+            let already = response.detail["already_exited"].as_u64().unwrap_or(0);
+            let refused = response.detail["refused"].as_u64().unwrap_or(0);
+            println!(
+                "Processes: {terminated} terminated, {already} already exited, {refused} left \
+                 running."
+            );
+            // Name every refusal. A process left running is the thing the operator most
+            // needs to know about, and a count alone does not say which one or why.
+            for record in response.detail["records"].as_array().into_iter().flatten() {
+                if let Some(reason) = record["reason"].as_str() {
+                    println!(
+                        "  pid {} ({}) was NOT stopped: {reason}",
+                        record["pid"], record["executable"]
+                    );
+                }
+            }
+        }
+        println!();
+        println!(
+            "Only processes VIGIL recorded are reached. One spawned outside the brokers, or \
+             daemonised away from its parent, is not in the graph and is unaffected."
+        );
+    } else {
+        println!(
+            "No process was terminated. Containment withholds authority from brokered \
+             requests; a process that bypasses the brokers is unaffected. Pass --terminate to \
+             stop the session's process tree as well."
+        );
+    }
     Ok(())
 }
 
@@ -2933,14 +2989,19 @@ fn run_local_session(
         .ok()
         .filter(|bytes| bytes.len() <= 64 * 1024 * 1024)
         .map(|bytes| vigil_common::ContentHash::sha256(&bytes).to_string());
-    let root = store.record_process_start(
-        &session.id,
-        None,
-        child.id(),
-        &executable.to_string_lossy(),
-        &session.argv,
-        root_digest.as_deref(),
-    )?;
+    // Captured while the child handle is held, so the PID cannot have been recycled between
+    // spawning and reading. This is what later lets `vigil contain --terminate` tell this
+    // process from whatever else might hold the number by then.
+    let root_observed = vigil_local::identify(child.id()).ok().flatten();
+    let root = store.record_process_start(&vigil_local::NewProcess {
+        session_id: &session.id,
+        parent_node_id: None,
+        pid: child.id(),
+        executable: &executable.to_string_lossy(),
+        argv: &session.argv,
+        executable_sha256: root_digest.as_deref(),
+        observed: root_observed.as_ref(),
+    })?;
     store.append_event(
         &session.id,
         "process",

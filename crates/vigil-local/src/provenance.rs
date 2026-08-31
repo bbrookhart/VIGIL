@@ -67,6 +67,16 @@ pub struct ProcessNode {
     pub pid: u32,
     pub started_at: DateTime<Utc>,
     pub exited_at: Option<DateTime<Utc>>,
+    /// The kernel's start time for this PID, captured at spawn.
+    ///
+    /// `None` for nodes recorded before identity capture existed. Such a node can never be
+    /// distinguished from a recycled PID, so it is never signalled.
+    #[serde(default)]
+    pub os_started_at: Option<String>,
+    /// The command as the kernel reported it at spawn, captured alongside
+    /// [`Self::os_started_at`] so the later comparison is like for like.
+    #[serde(default)]
+    pub os_executable: Option<String>,
     pub executable: String,
     pub executable_sha256: Option<String>,
     pub argv: Vec<String>,
@@ -74,6 +84,23 @@ pub struct ProcessNode {
     pub generation: u32,
     pub exit_code: Option<i32>,
     pub status: ProcessStatus,
+}
+
+/// A process to record, mirroring `NewSession` for sessions.
+///
+/// Grouped rather than passed positionally because the identity fields are easy to transpose:
+/// `executable` is the path the caller asked to run, while `observed` carries what the kernel
+/// reported, and confusing the two is what makes an identity check vacuous (ADR 0041).
+#[derive(Debug, Clone, Copy)]
+pub struct NewProcess<'a> {
+    pub session_id: &'a str,
+    pub parent_node_id: Option<&'a str>,
+    pub pid: u32,
+    pub executable: &'a str,
+    pub argv: &'a [String],
+    pub executable_sha256: Option<&'a str>,
+    /// What `ps` reported for this PID at spawn. `None` makes the node unsignallable.
+    pub observed: Option<&'a crate::process_identity::ProcessIdentity>,
 }
 
 /// A parent-to-child relationship, derived from the nodes rather than stored.
@@ -162,15 +189,16 @@ impl LocalStore {
     ///
     /// Fails when the PID is already claimed by a live node in this session, which is what
     /// makes PID reuse a recorded conflict rather than a silent misattribution.
-    pub fn record_process_start(
-        &self,
-        session_id: &str,
-        parent_node_id: Option<&str>,
-        pid: u32,
-        executable: &str,
-        argv: &[String],
-        executable_sha256: Option<&str>,
-    ) -> Result<ProcessNode> {
+    pub fn record_process_start(&self, request: &NewProcess<'_>) -> Result<ProcessNode> {
+        let NewProcess {
+            session_id,
+            parent_node_id,
+            pid,
+            executable,
+            argv,
+            executable_sha256,
+            observed,
+        } = *request;
         let transaction =
             Transaction::new_unchecked(&self.connection, TransactionBehavior::Immediate)
                 .map_err(super::store::storage_error)?;
@@ -207,6 +235,8 @@ impl LocalStore {
             pid,
             started_at: Utc::now(),
             exited_at: None,
+            os_started_at: observed.map(|identity| identity.os_started_at.clone()),
+            os_executable: observed.map(|identity| identity.executable.clone()),
             executable: vigil_common::redact::single_line_excerpt(executable, 500),
             executable_sha256: executable_sha256.map(str::to_string),
             // Arguments routinely carry inline tokens; record their shape, never their value.
@@ -222,8 +252,9 @@ impl LocalStore {
             .execute(
                 "INSERT INTO processes
                  (node_id, session_id, parent_node_id, pid, started_at, executable,
-                  executable_sha256, argv_json, generation, status)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'running')",
+                  executable_sha256, argv_json, generation, status, os_started_at,
+                  os_executable)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'running', ?10, ?11)",
                 params![
                     node.node_id,
                     node.session_id,
@@ -234,6 +265,8 @@ impl LocalStore {
                     node.executable_sha256,
                     serde_json::to_string(&node.argv)?,
                     node.generation,
+                    node.os_started_at,
+                    node.os_executable,
                 ],
             )
             .map_err(|error| match error {
@@ -282,7 +315,8 @@ impl LocalStore {
             .connection
             .prepare(
                 "SELECT node_id, session_id, parent_node_id, pid, started_at, exited_at,
-                        executable, executable_sha256, argv_json, generation, exit_code, status
+                        executable, executable_sha256, argv_json, generation, exit_code,
+                        status, os_started_at, os_executable
                  FROM processes WHERE session_id = ?1 ORDER BY started_at, node_id",
             )
             .map_err(super::store::storage_error)?;
@@ -330,6 +364,8 @@ fn node_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Result<ProcessNode
     let generation: i64 = row.get(9)?;
     let exit_code: Option<i32> = row.get(10)?;
     let status: String = row.get(11)?;
+    let os_started_at: Option<String> = row.get(12)?;
+    let os_executable: Option<String> = row.get(13)?;
 
     Ok((|| {
         Ok(ProcessNode {
@@ -341,6 +377,8 @@ fn node_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Result<ProcessNode
             })?,
             started_at: parse_time(&started_at)?,
             exited_at: exited_at.as_deref().map(parse_time).transpose()?,
+            os_started_at,
+            os_executable,
             executable,
             executable_sha256,
             argv: serde_json::from_str(&argv)?,
@@ -391,11 +429,27 @@ mod tests {
     fn one_pid_cannot_belong_to_two_live_processes() {
         let (root, store, session) = active_session();
         let first = store
-            .record_process_start(&session, None, 4242, "/bin/echo", &[], None)
+            .record_process_start(&NewProcess {
+                session_id: &session,
+                parent_node_id: None,
+                pid: 4242,
+                executable: "/bin/echo",
+                argv: &[],
+                executable_sha256: None,
+                observed: None,
+            })
             .expect("record first");
 
         let conflict = store
-            .record_process_start(&session, None, 4242, "/bin/cat", &[], None)
+            .record_process_start(&NewProcess {
+                session_id: &session,
+                parent_node_id: None,
+                pid: 4242,
+                executable: "/bin/cat",
+                argv: &[],
+                executable_sha256: None,
+                observed: None,
+            })
             .expect_err("a live pid must not be reassignable");
         assert!(matches!(conflict, VigilError::AuditIntegrity(_)));
 
@@ -405,7 +459,15 @@ mod tests {
             .record_process_exit(&first.node_id, Some(0), ProcessStatus::Exited)
             .expect("close first");
         let second = store
-            .record_process_start(&session, None, 4242, "/bin/cat", &[], None)
+            .record_process_start(&NewProcess {
+                session_id: &session,
+                parent_node_id: None,
+                pid: 4242,
+                executable: "/bin/cat",
+                argv: &[],
+                executable_sha256: None,
+                observed: None,
+            })
             .expect("record reused pid");
 
         assert_ne!(first.node_id, second.node_id);
@@ -429,14 +491,15 @@ mod tests {
         let mut parent: Option<String> = None;
         for expected_generation in 0..4 {
             let node = store
-                .record_process_start(
-                    &session,
-                    parent.as_deref(),
-                    5000 + expected_generation,
-                    "/bin/echo",
-                    &[],
-                    None,
-                )
+                .record_process_start(&NewProcess {
+                    session_id: &session,
+                    parent_node_id: parent.as_deref(),
+                    pid: 5000 + expected_generation,
+                    executable: "/bin/echo",
+                    argv: &[],
+                    executable_sha256: None,
+                    observed: None,
+                })
                 .expect("record");
             assert_eq!(node.generation, expected_generation);
             parent = Some(node.node_id);
@@ -447,7 +510,15 @@ mod tests {
         assert_eq!(graph.edges.len(), 3);
 
         assert!(store
-            .record_process_start(&session, Some("prc_missing"), 6000, "/bin/echo", &[], None)
+            .record_process_start(&NewProcess {
+                session_id: &session,
+                parent_node_id: Some("prc_missing"),
+                pid: 6000,
+                executable: "/bin/echo",
+                argv: &[],
+                executable_sha256: None,
+                observed: None,
+            })
             .is_err());
         let _ = std::fs::remove_dir_all(root);
     }
@@ -456,14 +527,15 @@ mod tests {
     fn closing_a_node_is_idempotent_and_arguments_are_never_stored_raw() {
         let (root, store, session) = active_session();
         let node = store
-            .record_process_start(
-                &session,
-                None,
-                7000,
-                "/bin/echo",
-                &["Authorization: Bearer secret-token-value".to_string()],
-                None,
-            )
+            .record_process_start(&NewProcess {
+                session_id: &session,
+                parent_node_id: None,
+                pid: 7000,
+                executable: "/bin/echo",
+                argv: &["Authorization: Bearer secret-token-value".to_string()],
+                executable_sha256: None,
+                observed: None,
+            })
             .expect("record");
         assert!(!node.argv.join(" ").contains("secret-token-value"));
 
@@ -498,6 +570,8 @@ mod tests {
             generation: 0,
             exit_code: None,
             status: ProcessStatus::Running,
+            os_started_at: None,
+            os_executable: None,
         }
     }
 

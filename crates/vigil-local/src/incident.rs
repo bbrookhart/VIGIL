@@ -60,14 +60,21 @@ pub enum ResponseAction {
     QuarantineSession,
     /// End the session and freeze its evidence.
     SealSession,
+    /// Stop every live process attributed to the session, deepest generation first.
+    ///
+    /// Unlike the other actions this reaches outside VIGIL's own bookkeeping, so it is the
+    /// one that can partially fail: a process whose identity no longer matches what was
+    /// recorded is left running and reported (ADR 0041).
+    TerminateProcessTree,
 }
 
 impl ResponseAction {
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 5] = [
         Self::RevokeCapabilities,
         Self::RestrictSession,
         Self::QuarantineSession,
         Self::SealSession,
+        Self::TerminateProcessTree,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -76,6 +83,7 @@ impl ResponseAction {
             Self::RestrictSession => "RESTRICT_SESSION",
             Self::QuarantineSession => "QUARANTINE_SESSION",
             Self::SealSession => "SEAL_SESSION",
+            Self::TerminateProcessTree => "TERMINATE_PROCESS_TREE",
         }
     }
 }
@@ -307,6 +315,29 @@ impl LocalStore {
                     )
                 }
             },
+            ResponseAction::TerminateProcessTree => {
+                let report = self.terminate_session_tree(&incident.session_id)?;
+                let outcome = if report.records.is_empty() {
+                    // Nothing was running. Distinguishable from "everything refused", which
+                    // is what makes the record worth reading afterwards.
+                    ResponseOutcome::AlreadyApplied
+                } else if report.terminated() == 0 && report.has_refusals() {
+                    // Every live process was left running. Reporting this as applied would
+                    // tell an operator the tree was stopped when it was not.
+                    ResponseOutcome::Refused
+                } else {
+                    ResponseOutcome::Applied
+                };
+                (
+                    outcome,
+                    serde_json::json!({
+                        "terminated": report.terminated(),
+                        "already_exited": report.already_exited(),
+                        "refused": report.refused(),
+                        "records": report.records,
+                    }),
+                )
+            }
         };
 
         let response = IncidentResponse {
