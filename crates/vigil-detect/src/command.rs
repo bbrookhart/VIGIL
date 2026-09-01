@@ -311,8 +311,17 @@ fn percent_decode_lossy(input: &str) -> String {
 
 /// Whether decoding introduced a path-traversal primitive that was not present before.
 fn reveals_traversal_primitives(original: &str, decoded: &str) -> bool {
-    let introduced = |needle: &str| decoded.contains(needle) && !original.contains(needle);
-    introduced("..") || introduced("/") || decoded.contains('\0')
+    let occurrences = |value: &str, needle: &str| value.match_indices(needle).count();
+    let separators = |value: &str| {
+        value
+            .chars()
+            .filter(|character| *character == '/' || *character == '\\')
+            .count()
+    };
+
+    occurrences(decoded, "..") > occurrences(original, "..")
+        || separators(decoded) > separators(original)
+        || decoded.contains('\0')
 }
 
 /// Lexically normalize a path.
@@ -445,6 +454,17 @@ mod tests {
             .reason_codes
             .contains(&ReasonCode::PathTraversal));
         assert!(encoded_findings
+            .reason_codes
+            .contains(&ReasonCode::PathOutsideAllowlist));
+
+        // A pre-existing slash or parent component must not hide an additional separator or
+        // parent reference introduced by decoding.
+        let encoded_separator = r"\.ce%5CTac///////../workspace/";
+        let separator_findings = analyze_path(encoded_separator, &roots);
+        assert!(separator_findings
+            .reason_codes
+            .contains(&ReasonCode::PathTraversal));
+        assert!(separator_findings
             .reason_codes
             .contains(&ReasonCode::PathOutsideAllowlist));
     }
