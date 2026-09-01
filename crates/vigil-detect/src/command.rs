@@ -418,6 +418,26 @@ mod tests {
     }
 
     #[test]
+    fn mixed_separators_keep_detection_and_containment_aligned() {
+        // Exact shape found by libFuzzer in CI run 14. The detector used to fold the
+        // backslashes while the shared containment helper did not, producing opposite answers.
+        let roots = vec!["/workspace".to_string(), "/srv/data".to_string()];
+        let candidate = r"/%!.\>-O&/../srv/data/%!.\>-O&/..";
+
+        let inside = vigil_common::path::is_inside_any(candidate, &roots);
+        let findings = analyze_path(candidate, &roots);
+        let flagged_outside = findings
+            .reason_codes
+            .contains(&ReasonCode::PathOutsideAllowlist);
+
+        assert_eq!(
+            inside,
+            !flagged_outside,
+            "containment and detection disagreed for {candidate:?}: {findings:?}"
+        );
+    }
+
+    #[test]
     fn a_sibling_directory_does_not_match_a_root_by_prefix() {
         // `/workspace-evil` must not pass a `/workspace` root check.
         let roots = vec!["/workspace".to_string()];
