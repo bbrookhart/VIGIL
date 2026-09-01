@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/bbrookhart/VIGIL/actions/workflows/ci.yml"><img src="https://github.com/bbrookhart/VIGIL/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/bbrookhart/VIGIL/actions/workflows/ci.yml"><img src="https://github.com/bbrookhart/VIGIL/actions/workflows/ci.yml/badge.svg?branch=vigil_v2" alt="CI"></a>
   <img src="https://img.shields.io/badge/Rust-1.88%2B-102a43" alt="Rust 1.88 or newer">
   <img src="https://img.shields.io/badge/macOS-Apple%20Silicon-102a43" alt="Apple Silicon macOS target">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-0f766e" alt="Apache 2.0 license"></a>
@@ -37,7 +37,7 @@ enforcement adapters.
 | Where is the proof? | [Generated source inventory](docs/generated/evidence.md), [CI](https://github.com/bbrookhart/VIGIL/actions/workflows/ci.yml), [evaluation framework](docs/evaluation/EVALUATION_FRAMEWORK.md), [ADRs](docs/adr/), and [benchmark method](docs/evaluation/BENCHMARK_METHOD.md). |
 
 <!-- evidence:start -->
-The committed inventory currently finds **737 Rust test entry points, 199 Swift test entry
+The committed inventory currently finds **738 Rust test entry points, 199 Swift test entry
 points, 25 adversarial harness tests, 12 fuzz targets, 54 ADRs, 15 workspace
 crates, and zero unsafe Rust constructs**. Those are source declarations, not a
 hand-maintained “passing” count;
