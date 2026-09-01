@@ -438,12 +438,8 @@ mod tests {
         // CI run 23 found a different case: repeated percent decoding reveals a separator and
         // the input contains a null byte. Raw lexical containment says it is under /srv/data,
         // but detection must fail closed after decoding rather than preserve that permission.
-        let encoded_candidate =
-            "/srv/data/.\0/..//..../..//..%2%66.%%./'/..../.:/";
-        assert!(vigil_common::path::is_inside_any(
-            encoded_candidate,
-            &roots
-        ));
+        let encoded_candidate = "/srv/data/.\0/..//..../..//..%2%66.%%./'/..../.:/";
+        assert!(vigil_common::path::is_inside_any(encoded_candidate, &roots));
         let encoded_findings = analyze_path(encoded_candidate, &roots);
         assert!(encoded_findings
             .reason_codes
