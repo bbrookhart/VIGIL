@@ -431,8 +431,7 @@ mod tests {
             .contains(&ReasonCode::PathOutsideAllowlist);
 
         assert_eq!(
-            inside,
-            !flagged_outside,
+            inside, !flagged_outside,
             "containment and detection disagreed for {candidate:?}: {findings:?}"
         );
     }
