@@ -311,7 +311,12 @@ fn percent_decode_lossy(input: &str) -> String {
 
 /// Whether decoding introduced a path-traversal primitive that was not present before.
 fn reveals_traversal_primitives(original: &str, decoded: &str) -> bool {
-    let occurrences = |value: &str, needle: &str| value.match_indices(needle).count();
+    let dot_components = |value: &str| {
+        value
+            .split(['/', '\\'])
+            .filter(|component| matches!(*component, "." | ".."))
+            .count()
+    };
     let separators = |value: &str| {
         value
             .chars()
@@ -319,7 +324,7 @@ fn reveals_traversal_primitives(original: &str, decoded: &str) -> bool {
             .count()
     };
 
-    occurrences(decoded, "..") > occurrences(original, "..")
+    dot_components(decoded) > dot_components(original)
         || separators(decoded) > separators(original)
         || decoded.contains('\0')
 }
@@ -465,6 +470,17 @@ mod tests {
             .reason_codes
             .contains(&ReasonCode::PathTraversal));
         assert!(separator_findings
+            .reason_codes
+            .contains(&ReasonCode::PathOutsideAllowlist));
+
+        // Decoding a component to a single dot is also structural: the following raw parent
+        // component can then pop the permitted root instead of the formerly literal component.
+        let encoded_dot = r"/srv/data\%2e\..\\%%%";
+        let dot_findings = analyze_path(encoded_dot, &roots);
+        assert!(dot_findings
+            .reason_codes
+            .contains(&ReasonCode::PathTraversal));
+        assert!(dot_findings
             .reason_codes
             .contains(&ReasonCode::PathOutsideAllowlist));
     }
