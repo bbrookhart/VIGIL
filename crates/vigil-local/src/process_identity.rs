@@ -225,8 +225,8 @@ fn run_bounded(command: &mut Command) -> Result<String> {
     }
     // ps returns 1 with empty output for a missing selected PID. A failed inspector
     // (including procfs access errors) is uncertainty, never evidence of process exit.
-    if !status.success()
-        && !(status.code() == Some(1) && buffer.trim().is_empty() && diagnostics.trim().is_empty())
+    if !(status.success()
+        || (status.code() == Some(1) && buffer.trim().is_empty() && diagnostics.trim().is_empty()))
     {
         return Err(VigilError::Unavailable {
             component: "process_identity",

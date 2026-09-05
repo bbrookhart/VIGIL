@@ -136,17 +136,10 @@ kubectl -n "$NS_VIGIL" wait --for=condition=Ready pod/mock-tool --timeout=120s >
 kubectl -n "$NS_AGENTS" wait --for=condition=Ready pod/agent --timeout=120s >/dev/null
 pass "mock tool and agent running"
 
+source "$ROOT/tests/e2e/http_probe.sh"
 agent_curl() {
-  local code status=0
-  code="$(kubectl -n "$NS_AGENTS" exec agent -- \
-    curl -s -o /dev/null -w '%{http_code}' --max-time 8 "$@")" || status=$?
-  if [[ "$status" == "0" ]]; then
-    printf '%s' "$code"
-  elif [[ "$status" == "28" && "$code" == "000" ]]; then
-    printf '000'
-  else
-    printf 'transport-error-%s' "$status"
-  fi
+  probe_http kubectl -n "$NS_AGENTS" exec agent -- \
+    curl -s -o /dev/null -w '%{http_code}' --max-time 8 "$@"
 }
 
 # ---------------------------------------------------------------- the assertions

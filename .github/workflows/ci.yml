@@ -38,6 +38,7 @@ jobs:
         with: { python-version: "3.11" }
       - run: python3 scripts/generate_evidence.py --check
       - run: python3 scripts/check_docs.py
+      - run: python3 -m unittest discover -s tests/e2e -p 'test_*.py'
 
   format:
     name: Format
