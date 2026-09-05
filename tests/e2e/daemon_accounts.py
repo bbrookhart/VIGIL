@@ -114,14 +114,17 @@ assert json.loads(data)['ok'] is False
         # Socket squatting cannot impersonate the service to the authenticated client.
         fake = workspace / "fake.sock"
         fake_process = subprocess.Popen([sys.executable, "-c",
-            "import socket,sys,time,os; s=socket.socket(socket.AF_UNIX); s.bind(sys.argv[1]); "
-            "os.chmod(sys.argv[1],0o666); s.listen(); time.sleep(10)", str(fake)],
+            "import socket,sys,time,os,pathlib; s=socket.socket(socket.AF_UNIX); s.bind(sys.argv[1]); "
+            "os.chmod(sys.argv[1],0o666); s.listen(); "
+            "pathlib.Path(sys.argv[1]+'.ready').touch(); time.sleep(10)", str(fake)],
             user=AGENT, group=AGENT, extra_groups=[])
         try:
             for _ in range(100):
-                if fake.exists(): break
+                if Path(str(fake) + ".ready").exists(): break
                 time.sleep(0.01)
-            call(OPERATOR, {"method": "status"}, endpoint=fake, ok=False)
+            assert Path(str(fake) + ".ready").exists(), "fake server never listened"
+            result = call(OPERATOR, {"method": "status"}, endpoint=fake, ok=False)
+            assert "server UID mismatch" in result.stderr, result.stderr
         finally:
             fake_process.terminate(); fake_process.wait(timeout=10)
 
