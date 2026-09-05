@@ -108,7 +108,7 @@ kind: Service
 metadata: { name: mock-tool, labels: { app: mock-tool } }
 spec:
   selector: { app: mock-tool }
-  ports: [{ port: 80, targetPort: 80 }]
+  ports: [{ port: 80, targetPort: 5678 }]
 ---
 apiVersion: v1
 kind: Pod
@@ -117,8 +117,12 @@ spec:
   containers:
     - name: tool
       image: hashicorp/http-echo:1.0
-      args: ["-listen=:80", "-text=SIDE EFFECT EXECUTED"]
-      ports: [{ containerPort: 80 }]
+      args: ["-listen=:5678", "-text=SIDE EFFECT EXECUTED"]
+      ports: [{ containerPort: 5678 }]
+      readinessProbe:
+        httpGet: { path: /, port: 5678 }
+        periodSeconds: 1
+        failureThreshold: 30
 EOF
 
 kubectl -n "$NS_AGENTS" apply -f - <<'EOF' >/dev/null
@@ -132,7 +136,10 @@ spec:
       command: ["sleep", "3600"]
 EOF
 
-kubectl -n "$NS_VIGIL" wait --for=condition=Ready pod/mock-tool --timeout=120s >/dev/null
+kubectl -n "$NS_VIGIL" wait --for=condition=Ready pod/mock-tool --timeout=120s >/dev/null || {
+  kubectl -n "$NS_VIGIL" logs mock-tool --tail=40 || true
+  fail "mock tool did not become HTTP-ready"
+}
 kubectl -n "$NS_AGENTS" wait --for=condition=Ready pod/agent --timeout=120s >/dev/null
 pass "mock tool and agent running"
 
