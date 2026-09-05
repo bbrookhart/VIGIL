@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/bbrookhart/VIGIL/actions/workflows/ci.yml"><img src="https://github.com/bbrookhart/VIGIL/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/bbrookhart/VIGIL/actions/workflows/ci.yml"><img src="https://github.com/bbrookhart/VIGIL/actions/workflows/ci.yml/badge.svg?branch=vigil_v2" alt="CI"></a>
   <img src="https://img.shields.io/badge/Rust-1.88%2B-102a43" alt="Rust 1.88 or newer">
   <img src="https://img.shields.io/badge/macOS-Apple%20Silicon-102a43" alt="Apple Silicon macOS target">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-0f766e" alt="Apache 2.0 license"></a>
@@ -24,6 +24,9 @@ enforcement adapters.
 > bypasses the brokers is not currently confined. See [Enforcement status](docs/security/ENFORCEMENT_STATUS.md).
 
 ![VIGIL architecture](assets/architecture.svg)
+
+For the implementation-directive gap analysis and ordered acceptance gates, see the
+[current-state audit](docs/current-state-audit.md).
 
 ## VIGIL in 60 seconds
 
