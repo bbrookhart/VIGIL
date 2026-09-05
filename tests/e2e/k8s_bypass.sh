@@ -173,8 +173,8 @@ log "Assertion 4 — the block is the policy, not a broken cluster"
 kubectl -n "$NS_VIGIL" run prober --restart=Never --image=curlimages/curl:8.10.1 \
   --command -- sleep 300 >/dev/null
 kubectl -n "$NS_VIGIL" wait --for=condition=Ready pod/prober --timeout=120s >/dev/null
-inside="$(kubectl -n "$NS_VIGIL" exec prober -- \
-  curl -s -o /dev/null -w '%{http_code}' --max-time 8 "http://mock-tool.$NS_VIGIL.svc.cluster.local:80/" 2>/dev/null || echo "000")"
+inside="$(probe_http kubectl -n "$NS_VIGIL" exec prober -- \
+  curl -s -o /dev/null -w '%{http_code}' --max-time 8 "http://$tool_ip:80/")"
 [[ "$inside" == "200" ]] || fail "the mock tool is unreachable even from inside VIGIL's namespace (HTTP $inside); assertion 3 passed for the wrong reason"
 pass "the tool IS reachable from inside VIGIL's namespace (HTTP $inside) — the block is the policy"
 
