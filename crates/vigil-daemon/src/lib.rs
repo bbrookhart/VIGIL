@@ -229,6 +229,25 @@ impl Authority {
         if !self.config.may_call(uid, &request) {
             return Err("forbidden".into());
         }
+        let operation = match &request {
+            Request::Status {} => "status",
+            Request::Authorize { .. } => "authorize",
+            Request::Approvals {} => "approvals",
+            Request::Grant { .. } => "grant",
+            Request::Deny { .. } => "deny",
+            Request::Checkpoint {} => "checkpoint",
+        };
+        // Record authenticated intent before any authority mutation. No resource
+        // contents or caller-provided identity are written to this event.
+        let intent = self.store.append_event(
+            &self.session_id,
+            "authority",
+            operation,
+            Some("REQUESTED"),
+            "vigild-ipc",
+            &json!({"peer_uid": uid,
+                "request_sha256": vigil_common::ContentHash::sha256(&serde_json::to_vec(&request)?).to_string()}),
+        )?;
         let result = match request {
             Request::Status {} => {
                 json!({"session_id": self.session_id, "agent_uid": self.config.agent_uid,
@@ -294,6 +313,15 @@ impl Authority {
                     .write_checkpoint(&self.signer, chrono::Utc::now())?,
             )?,
         };
+        self.store.append_event(
+            &self.session_id,
+            "authority",
+            operation,
+            Some("COMPLETED"),
+            &intent.event_id,
+            &json!({"peer_uid": uid, "execution_supported": false,
+                "result_sha256": vigil_common::ContentHash::sha256(&serde_json::to_vec(&result)?).to_string()}),
+        )?;
         Ok(json!({"ok": true, "result": result}))
     }
 
