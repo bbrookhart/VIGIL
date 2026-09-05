@@ -160,10 +160,40 @@ fn load_signing_seeds(core: &CoreConfig) -> Result<([u8; 32], [u8; 32], [u8; 32]
 fn read_seed(variable: &str) -> Option<[u8; 32]> {
     let raw = std::env::var(variable).ok()?;
     // A path is the Kubernetes shape (a mounted Secret); hex is convenient locally.
-    let bytes = if let Ok(contents) = std::fs::read(&raw) {
-        contents
+    if let Ok(contents) = std::fs::read(&raw) {
+        decode_seed_file(&contents)
     } else {
-        hex::decode(raw.trim()).ok()?
-    };
-    <[u8; 32]>::try_from(bytes.as_slice()).ok()
+        let bytes = hex::decode(raw.trim()).ok()?;
+        <[u8; 32]>::try_from(bytes.as_slice()).ok()
+    }
+}
+
+fn decode_seed_file(contents: &[u8]) -> Option<[u8; 32]> {
+    // Preserve binary seed files, and accept the hex format emitted by `vigil keys generate`.
+    if let Ok(seed) = <[u8; 32]>::try_from(contents) {
+        return Some(seed);
+    }
+    let text = std::str::from_utf8(contents).ok()?;
+    let decoded = hex::decode(text.trim()).ok()?;
+    <[u8; 32]>::try_from(decoded.as_slice()).ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::decode_seed_file;
+
+    #[test]
+    fn generated_hex_and_legacy_binary_seeds_load_identically() {
+        let seed = [42u8; 32];
+        let generated = format!("{}\n", hex::encode(seed));
+        assert_eq!(decode_seed_file(generated.as_bytes()), Some(seed));
+        assert_eq!(decode_seed_file(&seed), Some(seed));
+    }
+
+    #[test]
+    fn malformed_seed_files_are_rejected() {
+        for contents in [b"not-a-key".as_slice(), &[0xff; 33], b"", &[b'a'; 63]] {
+            assert_eq!(decode_seed_file(contents), None);
+        }
+    }
 }

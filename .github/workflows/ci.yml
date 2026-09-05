@@ -38,6 +38,7 @@ jobs:
         with: { python-version: "3.11" }
       - run: python3 scripts/generate_evidence.py --check
       - run: python3 scripts/check_docs.py
+      - run: python3 -m unittest discover -s tests/e2e -p 'test_*.py'
 
   format:
     name: Format
@@ -304,8 +305,7 @@ jobs:
     name: Non-bypassability (kind)
     runs-on: ubuntu-latest
     # The proof that the deployment, not the application, is what makes VIGIL unbypassable.
-    # Heavier than the other jobs, so it runs on main and on demand rather than every push.
-    if: github.event_name == 'push' || github.event_name == 'schedule'
+    # Required on pull requests too: an unexecuted deployment gate is not validation.
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: dtolnay/rust-toolchain@1ff72ee08e3cb84d84adba594e0a297990fc1ed3 # stable

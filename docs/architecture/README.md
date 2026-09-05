@@ -114,11 +114,11 @@ the usual default, and the reason under-reporting is a safe failure.
 
 ## Failure modes
 
-Every dependency failure resolves against the action's impact tier (Invariant 7):
+Policy authorization failures deny every tier. Optional detector failures remain impact-aware:
 
 | Failure | Tier 0–1 (reads) | Tier 2+ (mutations, external, privileged) |
 |---|---|---|
-| Policy engine unavailable | `ALLOW_WITH_CONSTRAINTS` + `DEGRADED_MODE_ALLOW` | `DENY` + `FAIL_CLOSED` |
+| Policy engine unavailable | `DENY` + `FAIL_CLOSED` | `DENY` + `FAIL_CLOSED` |
 | Detector timeout or error | risk floor 0.35, `DETECTOR_DEGRADED`, confidence *lowered* | same, plus tier-driven denial |
 | Nonce store unavailable | — | `DENY` (an unavailable replay check is treated as a replay) |
 | Session store unavailable | error, no decision | error, no decision |

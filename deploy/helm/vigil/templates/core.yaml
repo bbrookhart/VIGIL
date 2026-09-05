@@ -84,9 +84,11 @@ spec:
               mountPath: /etc/vigil/vigil-core.yaml
               subPath: vigil-core.yaml
               readOnly: true
+            {{- if not .Values.policies.useImageDefaults }}
             - name: policies
               mountPath: /etc/vigil/policies
               readOnly: true
+            {{- end }}
             - name: keys
               mountPath: /etc/vigil/keys
               readOnly: true
@@ -100,9 +102,11 @@ spec:
         - name: config
           configMap:
             name: {{ include "vigil.fullname" . }}-core-config
+        {{- if not .Values.policies.useImageDefaults }}
         - name: policies
           configMap:
             name: {{ .Values.policies.configMapName }}
+        {{- end }}
         - name: keys
           secret:
             secretName: {{ .Values.core.signingKeysSecret }}

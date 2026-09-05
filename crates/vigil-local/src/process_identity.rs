@@ -117,7 +117,7 @@ pub fn identify(pid: u32) -> Result<Option<ProcessIdentity>> {
             .arg(pid.to_string())
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null()),
+            .stderr(Stdio::piped()),
     )?;
 
     parse_ps_output(pid, &output)
@@ -182,9 +182,9 @@ fn run_bounded(command: &mut Command) -> Result<String> {
     })?;
 
     let deadline = Instant::now() + Duration::from_millis(PS_TIMEOUT_MS);
-    loop {
+    let status = loop {
         match child.try_wait() {
-            Ok(Some(_)) => break,
+            Ok(Some(status)) => break status,
             Ok(None) => {
                 if Instant::now() >= deadline {
                     let _ = child.kill();
@@ -203,7 +203,7 @@ fn run_bounded(command: &mut Command) -> Result<String> {
                 })
             }
         }
-    }
+    };
 
     let mut buffer = String::new();
     if let Some(mut stdout) = child.stdout.take() {
@@ -214,12 +214,49 @@ fn run_bounded(command: &mut Command) -> Result<String> {
                 reason: format!("could not read {PS_PATH} output: {error}"),
             })?;
     }
+    let mut diagnostics = String::new();
+    if let Some(mut stderr) = child.stderr.take() {
+        stderr
+            .read_to_string(&mut diagnostics)
+            .map_err(|_| VigilError::Unavailable {
+                component: "process_identity",
+                reason: "could not read process inspector status".to_string(),
+            })?;
+    }
+    // ps returns 1 with empty output for a missing selected PID. A failed inspector
+    // (including procfs access errors) is uncertainty, never evidence of process exit.
+    if !(status.success()
+        || (status.code() == Some(1) && buffer.trim().is_empty() && diagnostics.trim().is_empty()))
+    {
+        return Err(VigilError::Unavailable {
+            component: "process_identity",
+            reason: format!("process inspector failed with {status}; identity is unknown"),
+        });
+    }
     Ok(buffer)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn failed_inspector_is_not_reported_as_an_exited_process() {
+        let result = run_bounded(
+            Command::new("/bin/sh")
+                .args(["-c", "echo unavailable >&2; exit 1"])
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped()),
+        );
+        assert!(result.is_err());
+        let result = run_bounded(
+            Command::new("/bin/sh")
+                .args(["-c", "exit 2"])
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped()),
+        );
+        assert!(result.is_err());
+    }
 
     /// A child that stays alive until it is dropped.
     struct Sleeper(std::process::Child);

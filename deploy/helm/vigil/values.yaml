@@ -90,6 +90,8 @@ networkPolicy:
   allowAgentInternetEgress: false
 
 policies:
+  # Use the versioned policy tree bundled in the image instead of a mounted ConfigMap.
+  useImageDefaults: false
   # Policy bundles, remits and tool manifests are mounted from a ConfigMap. `vigil policy
   # validate` should gate any change to them in CI.
   configMapName: vigil-policies

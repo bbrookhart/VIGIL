@@ -1,7 +1,7 @@
 # VIGIL developer commands.
 #
-# Targets that make a security claim run the tests that back it. `make verify` is what CI
-# runs and what a contributor should run before opening a pull request.
+# Targets that make a security claim run the tests that back it. `make verify` is a portable gate that CI
+# partially overlaps; additional CI jobs cover fuzzing, supply chain, deployment and native adapters.
 
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
@@ -74,8 +74,8 @@ test-contract: $(PY) ## Run the cross-language contract tests
 # ---------------------------------------------------------------- quality gates
 
 .PHONY: verify
-verify: fmt-check lint test evidence-check docs-check ## Everything CI runs
-	@echo "✓ all gates passed"
+verify: fmt-check lint test evidence-check docs-check ## Portable contributor gates; additional CI jobs remain separate
+	@echo "✓ portable contributor gates passed"
 
 .PHONY: verify-macos
 verify-macos: verify test-macos-adapter test-macos-network-adapter test-macos-app-support build-macos-app ## Portable gates plus native macOS products
