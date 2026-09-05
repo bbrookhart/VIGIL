@@ -6,8 +6,7 @@
   <strong>Runtime security that turns autonomous-agent intent into bounded, attributable side effects.</strong>
 </p>
 
-<p align="center">
-  <a href="https://github.com/bbrookhart/VIGIL/actions/workflows/ci.yml"><img src="https://github.com/bbrookhart/VIGIL/actions/workflows/ci.yml/badge.svg?branch=vigil_v2" alt="CI"></a>
+<p align="center"
   <img src="https://img.shields.io/badge/Rust-1.88%2B-102a43" alt="Rust 1.88 or newer">
   <img src="https://img.shields.io/badge/macOS-Apple%20Silicon-102a43" alt="Apple Silicon macOS target">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-0f766e" alt="Apache 2.0 license"></a>
