@@ -140,6 +140,7 @@ struct Binding {
 }
 
 pub struct Authority {
+    read_enabled: bool,
     #[cfg(target_os = "linux")]
     workspace: confined_read::ConfinedWorkspace,
     config: Config,
@@ -214,8 +215,15 @@ impl Authority {
                 executable: "vigild-authority-only".into(),
                 argv: vec![],
                 task: None,
-                enforcement_posture: "authority-ipc-only".into(),
+                enforcement_posture: if cfg!(target_os = "linux") {
+                    "semantic_enforced"
+                } else {
+                    "authority-ipc-only"
+                }
+                .into(),
             })?;
+            #[cfg(target_os = "linux")]
+            store.activate_semantic_session(&session.id)?;
             create_private(
                 &binding_path,
                 &serde_json::to_vec(&Binding {
@@ -227,7 +235,14 @@ impl Authority {
             fs::File::open(state)?.sync_all()?;
             session.id
         };
+        let session = store
+            .get_session(&session_id)?
+            .ok_or("bound session missing")?;
+        let read_enabled = cfg!(target_os = "linux")
+            && session.enforcement_posture == "semantic_enforced"
+            && session.status == vigil_local::SessionStatus::Running;
         Ok(Self {
+            read_enabled,
             #[cfg(target_os = "linux")]
             workspace,
             config,
@@ -265,8 +280,8 @@ impl Authority {
         let result = match request {
             Request::Status {} => {
                 json!({"session_id": self.session_id, "agent_uid": self.config.agent_uid,
-                "profile": self.config.profile, "execution_supported": cfg!(target_os = "linux"),
-                "execution_actions": if cfg!(target_os = "linux") { vec!["fs.read"] } else { vec![] },
+                "profile": self.config.profile, "execution_supported": self.read_enabled,
+                "execution_actions": if self.read_enabled { vec!["fs.read"] } else { vec![] },
                 "checkpoint_public_key": self.signer.verifying_key().to_bytes()})
             }
             Request::Authorize { action, resource } => {
@@ -358,6 +373,9 @@ impl Authority {
     fn execute_read(&self, resource: &str, correlation: &str) -> Result<Value> {
         use base64::Engine;
         use vigil_local::{BudgetCharge, BudgetDimension};
+        if !self.read_enabled {
+            return Err("this session has no read execution authority".into());
+        }
         let opened = self.workspace.prepare(resource, self.config.agent_uid)?;
         // Fresh authorization in this call; an earlier ALLOW or caller-supplied
         // decision cannot be replayed to the executor. Hold the descriptor throughout.

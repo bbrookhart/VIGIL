@@ -9,6 +9,7 @@ import base64
 import os
 from pathlib import Path
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -184,6 +185,19 @@ for i in range(1000):
         state.chmod(0o700)
         (state / "hostile-link").symlink_to(workspace / "example.txt")
         assert run_as(SERVICE, command).returncode != 0
+        (state / "hostile-link").unlink()
+        # Administrator fixture for state created by the earlier authority-only release.
+        # An upgrade must not silently activate it or reset its existing session.
+        with sqlite3.connect(state / "authority.db") as database:
+            database.execute("UPDATE sessions SET enforcement_posture='authority-ipc-only', status='starting'")
+        database.close()
+        start()
+        old_status = call(AGENT, {"method": "status"})
+        assert old_status["session_id"] == status["session_id"]
+        assert old_status["execution_actions"] == []
+        assert old_status["execution_supported"] is False
+        call(AGENT, read, ok=False)
+        stop()
         print("PASS: cross-account approvals, private state, impersonation, lease bounds and restart binding")
         print("PASS: descriptor-bound reads, byte/owner/type/link checks, budget exhaustion and persistence")
     finally:

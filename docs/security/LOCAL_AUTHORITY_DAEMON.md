@@ -98,6 +98,10 @@ vigild call --socket /run/vigild/authority.sock --server-uid 61001 \
 `content_base64`, plus device/inode identity and a durable execution event ID.
 Status advertises `execution_actions: ["fs.read"]` on Linux; other platforms
 advertise no execution actions and reject `read`.
+New Linux state uses an active logical semantic session, as required by existing
+budget enforcement. State created by the earlier authority-only release stays
+authority-only and advertises no execution actions. Provision a new state directory
+deliberately to enable reads; the daemon never promotes or resets old sessions.
 
 The kernel resolves beneath the pinned workspace with no symlinks, magic links
 or mount crossings. An `O_PATH` descriptor lets the daemon reject devices, FIFOs,
