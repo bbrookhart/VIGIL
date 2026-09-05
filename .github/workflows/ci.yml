@@ -29,6 +29,18 @@ env:
   RUSTFLAGS: "-D warnings"
 
 jobs:
+  daemon-accounts:
+    name: Daemon account separation (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: dtolnay/rust-toolchain@1ff72ee08e3cb84d84adba594e0a297990fc1ed3 # stable
+        with: { toolchain: "1.88" }
+      - uses: Swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2.7.5
+      - run: cargo test -p vigil-daemon --locked
+      - run: cargo build -p vigil-daemon --locked
+      - run: sudo python3 tests/e2e/daemon_accounts.py target/debug/vigild
+
   evidence:
     name: Evidence and docs
     runs-on: ubuntu-latest

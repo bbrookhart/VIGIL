@@ -2,6 +2,12 @@
 
 ## Human to control plane
 
+The experimental [local authority daemon](LOCAL_AUTHORITY_DAEMON.md) authenticates
+separate agent and operator UIDs through kernel Unix-socket credentials and keeps
+state under a third account. This applies only to its authority endpoint; legacy
+local CLI commands and brokers are not routed through it. UID identity does not
+establish human presence or authenticate a macOS application signature.
+
 Human approval is administrative authority, but UI possession alone is insufficient. Future
 approval IPC must verify the signed caller and use LocalAuthentication for configured high-risk
 operations. Approval is specific, expiring, and auditable.

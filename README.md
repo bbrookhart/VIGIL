@@ -28,6 +28,10 @@ enforcement adapters.
 For the implementation-directive gap analysis and ordered acceptance gates, see the
 [current-state audit](docs/current-state-audit.md).
 
+The experimental [local authority daemon](docs/security/LOCAL_AUTHORITY_DAEMON.md)
+separates agent, operator and service accounts for approvals and signing state.
+It returns authorization decisions; tool execution integration remains pending.
+
 ## VIGIL in 60 seconds
 
 | Question | Answer |
@@ -40,8 +44,8 @@ For the implementation-directive gap analysis and ordered acceptance gates, see 
 | Where is the proof? | [Generated source inventory](docs/generated/evidence.md), [CI](https://github.com/bbrookhart/VIGIL/actions/workflows/ci.yml), [evaluation framework](docs/evaluation/EVALUATION_FRAMEWORK.md), [ADRs](docs/adr/), and [benchmark method](docs/evaluation/BENCHMARK_METHOD.md). |
 
 <!-- evidence:start -->
-The committed inventory currently finds **740 Rust test entry points, 199 Swift test entry
-points, 25 adversarial harness tests, 12 fuzz targets, 55 ADRs, 15 workspace
+The committed inventory currently finds **745 Rust test entry points, 199 Swift test entry
+points, 25 adversarial harness tests, 12 fuzz targets, 56 ADRs, 16 workspace
 crates, and zero unsafe Rust constructs**. Those are source declarations, not a
 hand-maintained “passing” count;
 CI supplies execution status and rejects a stale inventory.
