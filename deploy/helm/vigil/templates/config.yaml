@@ -35,7 +35,7 @@ data:
     {{- end }}
     auth:
       method: {{ .Values.auth.method }}
-      registrations:
+      registrations:{{ if not .Values.auth.registrations }} []{{ end }}
       {{- range .Values.auth.registrations }}
         - spiffe_id: {{ .spiffeId | quote }}
           tenant_id: {{ .tenantId | quote }}
@@ -67,7 +67,7 @@ data:
         public_key: {{ .Values.gateway.capabilityPublicKey | default "" | quote }}
     auth:
       method: {{ .Values.auth.method }}
-      registrations:
+      registrations:{{ if not .Values.auth.registrations }} []{{ end }}
       {{- range .Values.auth.registrations }}
       {{- if .agentId }}
         - spiffe_id: {{ .spiffeId | quote }}

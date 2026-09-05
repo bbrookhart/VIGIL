@@ -8,14 +8,11 @@
 # that trusts the network. The NetworkPolicy in deploy/helm/vigil closes it, and this script
 # is what turns that from an assertion into a tested control.
 #
-# It deploys the chart plus a mock protected tool and an agent pod, then asserts three things
-# from inside the agent pod:
-#
-#   1. agent → gateway WITH a capability      → executes
-#   2. agent → gateway WITHOUT a capability   → 403, tool never invoked
-#   3. agent → mock tool DIRECTLY             → blocked by NetworkPolicy
-#
-# The third is the one that matters. If it succeeds, VIGIL is a logging library.
+# Deployment network-boundary test: gateway reachability, unauthenticated refusal,
+# direct protected-tool denial, and a positive tool-reachability control.
+# This does not prove authenticated capability execution through the deployed HTTP service.
+# The in-process positive/negative capability controls live in vigil-core's end_to_end suite.
+# Do not describe this script alone as complete mediation or production authentication proof.
 #
 # Requires: kind, kubectl, helm, docker. Run via `make test-k8s`.
 set -euo pipefail
@@ -31,6 +28,7 @@ pass() { printf '  \033[32m✓\033[0m %s\n' "$*"; }
 fail() { printf '  \033[31m✗\033[0m %s\n' "$*"; exit 1; }
 
 cleanup() {
+  if [[ -n "${KEYDIR:-}" ]]; then rm -rf -- "$KEYDIR"; fi
   if [[ "${KEEP_CLUSTER:-0}" != "1" ]]; then
     kind delete cluster --name "$CLUSTER" >/dev/null 2>&1 || true
   fi
@@ -79,9 +77,6 @@ kubectl -n "$NS_VIGIL" create secret generic vigil-signing-keys \
   --from-file=capability.key="$KEYDIR/capability.key" \
   --from-file=approval.key="$KEYDIR/approval.key" \
   --from-file=audit.key="$KEYDIR/audit.key" >/dev/null
-kubectl -n "$NS_VIGIL" create configmap vigil-policies \
-  --from-file="$ROOT/policies" >/dev/null 2>&1 || \
-  kubectl -n "$NS_VIGIL" create configmap vigil-policies --from-file="$ROOT/policies/base" >/dev/null
 pass "keys and policies installed (Gateway receives only the public half)"
 
 # ---------------------------------------------------------------- deploy
@@ -90,12 +85,20 @@ log "Installing the chart"
 helm install vigil "$ROOT/deploy/helm/vigil" \
   --namespace "$NS_VIGIL" \
   --set tenant=acme \
+  --set policies.useImageDefaults=true \
   --set image.registry=docker.io --set image.repository=library/vigil --set image.tag=e2e \
   --set image.pullPolicy=Never \
   --set gateway.capabilityPublicKey="$CAP_PUB" \
   --set networkPolicy.agentNamespaces="{$NS_AGENTS}" \
   --set auth.peerIdentity.trustedPeers="{10.0.0.1}" \
-  --wait --timeout 300s >/dev/null
+  --wait --timeout 300s >/dev/null || {
+    kubectl -n "$NS_VIGIL" get pods -o wide
+    kubectl -n "$NS_VIGIL" get events --sort-by=.lastTimestamp
+    # Logs describe startup errors; never dump Secret objects or environment values.
+    kubectl -n "$NS_VIGIL" logs -l app.kubernetes.io/component=core --tail=40 || true
+    kubectl -n "$NS_VIGIL" logs -l app.kubernetes.io/component=gateway --tail=40 || true
+    fail "VIGIL did not become ready"
+  }
 pass "VIGIL deployed"
 
 log "Deploying the mock protected tool and the agent"
@@ -134,8 +137,16 @@ kubectl -n "$NS_AGENTS" wait --for=condition=Ready pod/agent --timeout=120s >/de
 pass "mock tool and agent running"
 
 agent_curl() {
-  kubectl -n "$NS_AGENTS" exec agent -- \
-    curl -s -o /dev/null -w '%{http_code}' --max-time 8 "$@" 2>/dev/null || echo "000"
+  local code status=0
+  code="$(kubectl -n "$NS_AGENTS" exec agent -- \
+    curl -s -o /dev/null -w '%{http_code}' --max-time 8 "$@")" || status=$?
+  if [[ "$status" == "0" ]]; then
+    printf '%s' "$code"
+  elif [[ "$status" == "28" && "$code" == "000" ]]; then
+    printf '000'
+  else
+    printf 'transport-error-%s' "$status"
+  fi
 }
 
 # ---------------------------------------------------------------- the assertions
@@ -154,7 +165,9 @@ pass "gateway refused an uncapability'd action (HTTP $code)"
 log "Assertion 3 — the agent CANNOT reach the protected tool directly"
 # The load-bearing assertion. A NetworkPolicy drop manifests as a timeout, so curl reports
 # 000 rather than a status code. Anything else means the boundary is not enforced.
-code="$(agent_curl "http://mock-tool.$NS_VIGIL.svc.cluster.local:80/")"
+tool_ip="$(kubectl -n "$NS_VIGIL" get service mock-tool -o jsonpath='{.spec.clusterIP}')"
+[[ -n "$tool_ip" ]] || fail "mock-tool has no ClusterIP"
+code="$(agent_curl "http://$tool_ip:80/")"
 if [[ "$code" == "200" ]]; then
   fail "THE AGENT REACHED THE PROTECTED TOOL DIRECTLY. VIGIL is bypassable in this deployment."
 fi
@@ -174,4 +187,4 @@ pass "the tool IS reachable from inside VIGIL's namespace (HTTP $inside) — the
 
 log "RESULT"
 echo "  The protected tool is reachable from VIGIL and unreachable from the agent."
-echo "  Non-bypassability is enforced by the deployment, not merely asserted."
+echo "  Network isolation passed for this deployment; authenticated capability execution is a separate gate."

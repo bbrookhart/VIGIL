@@ -40,8 +40,8 @@ For the implementation-directive gap analysis and ordered acceptance gates, see 
 | Where is the proof? | [Generated source inventory](docs/generated/evidence.md), [CI](https://github.com/bbrookhart/VIGIL/actions/workflows/ci.yml), [evaluation framework](docs/evaluation/EVALUATION_FRAMEWORK.md), [ADRs](docs/adr/), and [benchmark method](docs/evaluation/BENCHMARK_METHOD.md). |
 
 <!-- evidence:start -->
-The committed inventory currently finds **737 Rust test entry points, 199 Swift test entry
-points, 25 adversarial harness tests, 12 fuzz targets, 54 ADRs, 15 workspace
+The committed inventory currently finds **738 Rust test entry points, 199 Swift test entry
+points, 25 adversarial harness tests, 12 fuzz targets, 55 ADRs, 15 workspace
 crates, and zero unsafe Rust constructs**. Those are source declarations, not a
 hand-maintained “passing” count;
 CI supplies execution status and rejects a stale inventory.

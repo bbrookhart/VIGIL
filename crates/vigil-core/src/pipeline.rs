@@ -36,10 +36,8 @@
 //!
 //! # Failure mode
 //!
-//! Every stage's failure is explicit. A policy engine outage, a detector timeout or a
-//! session-store failure resolves against the action's impact tier: Tier 2 and above fail
-//! closed (Invariant 7), Tier 0–1 reads may proceed in degraded mode with the
-//! `DEGRADED_MODE_ALLOW` reason code recorded.
+//! Policy evaluation failure denies every impact tier: read access also requires authority.
+//! Optional detector failure contributes restrictive evidence; it cannot mint permission.
 
 use std::sync::Arc;
 use vigil_capability::{CapabilityClaims, CapabilityIssuer};
@@ -298,16 +296,11 @@ impl DecisionPipeline {
                 (d, false)
             }
             Err(_) => {
-                // A policy backend outage. Fail closed for anything that can change the
-                // world; permit low-impact reads in degraded mode.
+                // Impact classification is not authorization. Even a read may expose secrets.
+                // Without a policy result, no tier may receive new authority.
                 reason_codes.push(ReasonCode::PolicyEngineUnavailable);
-                let decision = if effective_tier.must_fail_closed() {
-                    reason_codes.push(ReasonCode::FailClosed);
-                    Decision::fail_closed()
-                } else {
-                    reason_codes.push(ReasonCode::DegradedModeAllow);
-                    Decision::AllowWithConstraints
-                };
+                reason_codes.push(ReasonCode::FailClosed);
+                let decision = Decision::fail_closed();
                 (
                     vigil_policy::PolicyDecision {
                         decision,

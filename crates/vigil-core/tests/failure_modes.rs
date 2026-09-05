@@ -6,8 +6,7 @@
 //!
 //! Each test drives one dependency into failure through the trait seam it already has —
 //! `PolicyEngine`, `SemanticDetector`, `NonceStore`, `AuditSink` — and asserts the documented
-//! behaviour. The asymmetry is the point: low-impact reads may proceed in degraded mode, and
-//! anything that can change the world may not.
+//! behaviour. Policy outages deny reads as well as mutations: impact is not authority.
 
 use async_trait::async_trait;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -19,7 +18,6 @@ use vigil_core::{AuthenticatedRequest, CoreConfig, ToolManifestRegistry, VigilCo
 use vigil_detect::{DetectionContext, DetectorRegistry, SemanticDetector};
 use vigil_policy::{DeterministicPolicyEngine, PolicyDecision, PolicyEngine, PolicyRequest};
 use vigil_protocol::action::*;
-use vigil_protocol::decision::Decision;
 use vigil_protocol::detector::{DetectorId, DetectorOutcome, DetectorResult};
 use vigil_protocol::principal::{Principal, PrincipalKind};
 use vigil_protocol::reason::ReasonCode;
@@ -164,44 +162,19 @@ async fn policy_outage_fails_closed_for_a_high_impact_action() {
 }
 
 #[tokio::test]
-async fn policy_outage_permits_a_low_impact_read_in_degraded_mode() {
-    // The asymmetry the architecture doc promises: a degraded VIGIL should not take down a
-    // read-only assistant, but it must never wave through a write.
+async fn policy_outage_denies_low_impact_reads_without_minting_authority() {
     let core = core_with(
         Arc::new(UnavailablePolicyEngine),
         DetectorRegistry::with_builtins(),
     );
+    // A customer-record read has low impact classification but can disclose private data.
     let outcome = core.decide(&low_impact_read()).await.expect("decision");
-
-    assert!(
-        outcome.response.permits_execution(),
-        "a Tier 1 read should proceed in degraded mode, got {:?} because {:?}",
-        outcome.response.decision,
-        outcome.response.reason_codes
-    );
+    assert!(!outcome.response.permits_execution());
+    assert!(outcome.response.capability.is_none());
     let reasons = &outcome.response.reason_codes;
-    assert!(
-        reasons.contains(&ReasonCode::DegradedModeAllow),
-        "{reasons:?}"
-    );
-    assert!(
-        reasons.contains(&ReasonCode::PolicyEngineUnavailable),
-        "the degraded state must be visible in the record: {reasons:?}"
-    );
-}
-
-#[tokio::test]
-async fn a_degraded_allow_is_still_constrained_not_unconditional() {
-    let core = core_with(
-        Arc::new(UnavailablePolicyEngine),
-        DetectorRegistry::with_builtins(),
-    );
-    let outcome = core.decide(&low_impact_read()).await.expect("decision");
-    assert_eq!(
-        outcome.response.decision,
-        Decision::AllowWithConstraints,
-        "degraded mode must not produce an unconditional allow"
-    );
+    assert!(reasons.contains(&ReasonCode::PolicyEngineUnavailable));
+    assert!(reasons.contains(&ReasonCode::FailClosed));
+    assert!(!reasons.contains(&ReasonCode::DegradedModeAllow));
 }
 
 // ---------------------------------------------------------------- detector failure

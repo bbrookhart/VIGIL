@@ -1,12 +1,12 @@
 {
   "adversarial_harness_tests": 25,
-  "architecture_decisions": 54,
+  "architecture_decisions": 55,
   "crates_forbidding_unsafe": 15,
   "fuzz_targets": 12,
   "named_attack_paths": 21,
   "python_test_functions": 11,
   "release_security_gates": 11,
-  "rust_test_entry_points": 737,
+  "rust_test_entry_points": 738,
   "swift_test_entry_points": 199,
   "unsafe_code_constructs": 0,
   "workspace_crates": 15

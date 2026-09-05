@@ -34,12 +34,19 @@ fuzz_target!(|data: &[u8]| {
             inside,
             "`{candidate}` was judged inside a root but normalizes to `{normalized}`"
         );
-        // A contained path must not also be reported as escaping its base.
-        assert!(
-            !findings
-                .reason_codes
-                .contains(&vigil_protocol::reason::ReasonCode::PathOutsideAllowlist),
-            "`{candidate}` was both inside a root and outside the allowlist"
-        );
+        // The detector deliberately decodes repeated percent encoding and rejects null bytes
+        // before checking containment. In that fail-closed case it may be stricter than the raw
+        // filesystem-path helper. Without a traversal finding, the two answers must agree.
+        if !findings
+            .reason_codes
+            .contains(&vigil_protocol::reason::ReasonCode::PathTraversal)
+        {
+            assert!(
+                !findings
+                    .reason_codes
+                    .contains(&vigil_protocol::reason::ReasonCode::PathOutsideAllowlist),
+                "`{candidate}` was both inside a root and outside the allowlist"
+            );
+        }
     }
 });

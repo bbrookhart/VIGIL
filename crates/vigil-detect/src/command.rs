@@ -311,8 +311,22 @@ fn percent_decode_lossy(input: &str) -> String {
 
 /// Whether decoding introduced a path-traversal primitive that was not present before.
 fn reveals_traversal_primitives(original: &str, decoded: &str) -> bool {
-    let introduced = |needle: &str| decoded.contains(needle) && !original.contains(needle);
-    introduced("..") || introduced("/") || decoded.contains('\0')
+    let dot_components = |value: &str| {
+        value
+            .split(['/', '\\'])
+            .filter(|component| matches!(*component, "." | ".."))
+            .count()
+    };
+    let separators = |value: &str| {
+        value
+            .chars()
+            .filter(|character| *character == '/' || *character == '\\')
+            .count()
+    };
+
+    dot_components(decoded) > dot_components(original)
+        || separators(decoded) > separators(original)
+        || decoded.contains('\0')
 }
 
 /// Lexically normalize a path.
@@ -415,6 +429,60 @@ mod tests {
         let roots = vec!["/workspace".to_string()];
         assert!(analyze_path("/workspace/notes/a.txt", &roots).is_clean());
         assert!(analyze_path("/workspace", &roots).is_clean());
+    }
+
+    #[test]
+    fn path_analysis_matches_the_real_acceptance_boundary() {
+        // Exact shape found by libFuzzer in CI run 14. The detector used to fold the
+        // backslashes while the shared containment helper did not, producing opposite answers.
+        let roots = vec!["/workspace".to_string(), "/srv/data".to_string()];
+        let candidate = r"/%!.\>-O&/../srv/data/%!.\>-O&/..";
+
+        let inside = vigil_common::path::is_inside_any(candidate, &roots);
+        let findings = analyze_path(candidate, &roots);
+        let flagged_outside = findings
+            .reason_codes
+            .contains(&ReasonCode::PathOutsideAllowlist);
+
+        assert_eq!(
+            inside, !flagged_outside,
+            "containment and detection disagreed for {candidate:?}: {findings:?}"
+        );
+
+        // CI run 23 found a different case: repeated percent decoding reveals a separator and
+        // the input contains a null byte. Raw lexical containment says it is under /srv/data,
+        // but detection must fail closed after decoding rather than preserve that permission.
+        let encoded_candidate = "/srv/data/.\0/..//..../..//..%2%66.%%./'/..../.:/";
+        assert!(vigil_common::path::is_inside_any(encoded_candidate, &roots));
+        let encoded_findings = analyze_path(encoded_candidate, &roots);
+        assert!(encoded_findings
+            .reason_codes
+            .contains(&ReasonCode::PathTraversal));
+        assert!(encoded_findings
+            .reason_codes
+            .contains(&ReasonCode::PathOutsideAllowlist));
+
+        // A pre-existing slash or parent component must not hide an additional separator or
+        // parent reference introduced by decoding.
+        let encoded_separator = r"\.ce%5CTac///////../workspace/";
+        let separator_findings = analyze_path(encoded_separator, &roots);
+        assert!(separator_findings
+            .reason_codes
+            .contains(&ReasonCode::PathTraversal));
+        assert!(separator_findings
+            .reason_codes
+            .contains(&ReasonCode::PathOutsideAllowlist));
+
+        // Decoding a component to a single dot is also structural: the following raw parent
+        // component can then pop the permitted root instead of the formerly literal component.
+        let encoded_dot = r"/srv/data\%2e\..\\%%%";
+        let dot_findings = analyze_path(encoded_dot, &roots);
+        assert!(dot_findings
+            .reason_codes
+            .contains(&ReasonCode::PathTraversal));
+        assert!(dot_findings
+            .reason_codes
+            .contains(&ReasonCode::PathOutsideAllowlist));
     }
 
     #[test]

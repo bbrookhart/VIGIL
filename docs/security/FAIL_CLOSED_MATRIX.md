@@ -118,7 +118,7 @@ Until then the CLI reports the degraded posture prominently and never uses the w
 
 | Failure | Managed request | Rest of host |
 |---|---|---|
-| Policy engine error | Impact tier ≥ 2 fails closed; tiers 0–1 allow with constraints and a `DEGRADED_MODE_ALLOW` reason code. | Unaffected |
+| Policy engine error | Every impact tier denies with `FAIL_CLOSED`; no capability is minted. Read classification does not grant authority. | Unaffected |
 | Detector timeout or error | Converted to a non-zero-risk degraded result with `DETECTOR_DEGRADED`. A detector cannot fail *open*. | Unaffected |
 | Audit sink write failure | The append is aborted rather than acknowledged unchained. | Unaffected |
 | Telemetry export unavailable | Local enforcement continues. Export is never on the decision path. | Unaffected |

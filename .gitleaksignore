@@ -1,0 +1,22 @@
+# Reviewed historical false positives from CI job 99493263547.
+# generic-api-key matches are Curve25519.Signing.PrivateKey Swift type annotations.
+# private-key matches are the canary format template with the explicit non-key marker
+# ThisIsNotAKeyItIsBaitAndAuthorizesNothingAnywhereAtAll; no usable key is present.
+# Exact commit/path/rule/line fingerprints only; future occurrences remain scanned.
+d09173f03ef1a951c5df94cb95617bec08b2afa1:extensions/network-filter/Sources/VigilNetworkAdapter/SignedNetworkProviderHealth.swift:generic-api-key:114
+d09173f03ef1a951c5df94cb95617bec08b2afa1:extensions/network-filter/Tests/VigilNetworkAdapterTests/SignedNetworkProviderHealthTests.swift:generic-api-key:168
+d09173f03ef1a951c5df94cb95617bec08b2afa1:extensions/network-filter/Tests/VigilNetworkAdapterTests/SignedNetworkProviderHealthTests.swift:generic-api-key:194
+d09173f03ef1a951c5df94cb95617bec08b2afa1:extensions/network-filter/Sources/VigilNetworkAdapter/NativeNetworkPolicySigning.swift:generic-api-key:20
+d09173f03ef1a951c5df94cb95617bec08b2afa1:extensions/network-filter/Sources/VigilNetworkAdapter/NativeNetworkPolicySigning.swift:generic-api-key:89
+3ed4d26ac8777a56d81b6334568a11a37190b4ff:crates/vigil-local/src/canary.rs:private-key:107
+a24ddee3689de1e6555bc5b606c2a20eca2a868a:extensions/network-filter/Sources/VigilNetworkAdapter/NativeNetworkPolicySigning.swift:generic-api-key:20
+a24ddee3689de1e6555bc5b606c2a20eca2a868a:extensions/network-filter/Sources/VigilNetworkAdapter/NativeNetworkPolicySigning.swift:generic-api-key:89
+a24ddee3689de1e6555bc5b606c2a20eca2a868a:extensions/network-filter/Sources/VigilNetworkAdapter/SignedNetworkProviderHealth.swift:generic-api-key:114
+16422a561980f3db6aebfe980b7b7aa4b341481c:extensions/network-filter/Sources/VigilNetworkAdapter/NativeNetworkPolicySigning.swift:generic-api-key:20
+16422a561980f3db6aebfe980b7b7aa4b341481c:extensions/network-filter/Sources/VigilNetworkAdapter/NativeNetworkPolicySigning.swift:generic-api-key:89
+16422a561980f3db6aebfe980b7b7aa4b341481c:extensions/network-filter/Sources/VigilNetworkAdapter/SignedNetworkProviderHealth.swift:generic-api-key:114
+a24ddee3689de1e6555bc5b606c2a20eca2a868a:extensions/network-filter/Tests/VigilNetworkAdapterTests/SignedNetworkProviderHealthTests.swift:generic-api-key:168
+a24ddee3689de1e6555bc5b606c2a20eca2a868a:extensions/network-filter/Tests/VigilNetworkAdapterTests/SignedNetworkProviderHealthTests.swift:generic-api-key:194
+16422a561980f3db6aebfe980b7b7aa4b341481c:extensions/network-filter/Tests/VigilNetworkAdapterTests/SignedNetworkProviderHealthTests.swift:generic-api-key:168
+16422a561980f3db6aebfe980b7b7aa4b341481c:extensions/network-filter/Tests/VigilNetworkAdapterTests/SignedNetworkProviderHealthTests.swift:generic-api-key:194
+385792e092e94fa0fd2c3920368db1ffb1557417:crates/vigil-local/src/canary.rs:private-key:107
