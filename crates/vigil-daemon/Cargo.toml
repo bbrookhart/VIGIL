@@ -1,6 +1,6 @@
 [package]
 name = "vigil-daemon"
-description = "OS-authenticated local authority service (no tool execution)."
+description = "OS-authenticated local authority service with bounded Linux file reads."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -15,6 +15,7 @@ path = "src/main.rs"
 vigil-common.workspace = true
 vigil-local = { path = "../vigil-local" }
 chrono.workspace = true
+base64.workspace = true
 clap.workspace = true
 rand.workspace = true
 serde.workspace = true

@@ -5,7 +5,7 @@ use vigil_daemon::{Authority, Config, Request, Result};
 use vigil_local::LocalProfile;
 
 #[derive(Parser)]
-#[command(about = "Experimental VIGIL authority service; does not execute tools")]
+#[command(about = "Experimental VIGIL authority service with bounded Linux file reads")]
 struct Cli {
     #[command(subcommand)]
     command: Command,

@@ -5,9 +5,11 @@ Run only on a disposable test host: sudo python3 tests/e2e/daemon_accounts.py
 target/debug/vigild. Fails (does not skip) without the required privileges.
 """
 import json
+import base64
 import os
 from pathlib import Path
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -18,7 +20,7 @@ SERVICE, AGENT, OPERATOR, OUTSIDER = 61001, 61002, 61003, 61004
 
 def run_as(uid, argv, **kwargs):
     return subprocess.run(argv, user=uid, group=uid, extra_groups=[],
-                          capture_output=True, text=True, timeout=10, **kwargs)
+                          capture_output=True, text=True, timeout=kwargs.pop("timeout", 10), **kwargs)
 
 
 def main():
@@ -37,6 +39,16 @@ def main():
                                   (workspace, AGENT, 0o755)]:
             path.mkdir(); os.chown(path, owner, owner); path.chmod(mode)
         (workspace / "example.txt").write_text("must never be deleted by this service\n")
+        os.chown(workspace / "example.txt", AGENT, AGENT)
+        (workspace / "foreign.txt").write_text("belongs to another account")
+        (workspace / "link").symlink_to(state / "checkpoint.seed")
+        (workspace / "large").write_bytes(b"x" * 4097)
+        os.chown(workspace / "large", AGENT, AGENT)
+        os.mkfifo(workspace / "fifo")
+        os.chown(workspace / "fifo", AGENT, AGENT)
+        (workspace / "hard-source").write_text("hard linked")
+        os.chown(workspace / "hard-source", AGENT, AGENT)
+        os.link(workspace / "hard-source", workspace / "hard-link")
         socket = runtime / "authority.sock"
         command = [str(binary), "serve", "--state-dir", str(state), "--socket", str(socket),
                    "--agent-uid", str(AGENT), "--operator-uid", str(OPERATOR),
@@ -68,7 +80,17 @@ def main():
 
         start()
         status = call(AGENT, {"method": "status"})
-        assert status["execution_supported"] is False
+        assert status["execution_supported"] is True
+        assert status["execution_actions"] == ["fs.read"]
+        read = {"method": "read", "resource": "example.txt"}
+        result = call(AGENT, read)
+        assert base64.b64decode(result["content_base64"]) == (workspace / "example.txt").read_bytes()
+        assert result["inode"] == (workspace / "example.txt").stat().st_ino
+        call(OPERATOR, read, ok=False)
+        for resource in ["../state/checkpoint.seed", str(state / "checkpoint.seed"),
+                         "link", "foreign.txt", "large", "fifo", "hard-link"]:
+            denied = call(AGENT, {"method": "read", "resource": resource}, ok=False)
+            assert json.loads(denied.stdout)["error"] == "request_denied", denied.stderr
         call(OUTSIDER, {"method": "status"}, ok=False)
         call(AGENT, {"method": "status"}, server_uid=OPERATOR, ok=False)
         for method in ("approvals", "checkpoint"):
@@ -87,7 +109,7 @@ def main():
         assert lease["max_uses"] == 1, lease
         assert call(AGENT, request)["decision"]["outcome"] == "ALLOW"
         assert call(AGENT, request)["decision"]["outcome"] == "REQUIRE_APPROVAL"
-        assert (workspace / "example.txt").exists(), "authority service executed a tool"
+        assert (workspace / "example.txt").exists(), "authority service executed an unsupported delete"
         checkpoint = call(OPERATOR, {"method": "checkpoint"})
         assert checkpoint["signature"]
 
@@ -102,6 +124,26 @@ while len(data)<n: data+=s.recv(n-len(data))
 assert json.loads(data)['ok'] is False
 """
         assert run_as(AGENT, [sys.executable, "-c", raw, str(socket), approval_id]).returncode == 0
+
+        # Exercise the real untrusted-agent read budget, without editing authority state.
+        # One read already succeeded; the next 999 succeed and the 1001st is denied.
+        exhaust = """import socket,struct,sys,json
+def receive(s,n):
+ data=b''
+ while len(data)<n:
+  part=s.recv(n-len(data)); assert part; data+=part
+ return data
+for i in range(1000):
+ with socket.socket(socket.AF_UNIX) as s:
+  s.settimeout(5); s.connect(sys.argv[1])
+  b=b'{"method":"read","resource":"example.txt"}'
+  s.sendall(struct.pack('!I',len(b))+b)
+  n=struct.unpack('!I',receive(s,4))[0]
+  response=json.loads(receive(s,n))
+  assert response['ok'] == (i<999), (i,response)
+"""
+        result = run_as(AGENT, [sys.executable, "-c", exhaust, str(socket)], timeout=120)
+        assert result.returncode == 0, result.stderr
 
         for name in ("authority.db", "checkpoint.seed", "binding.json"):
             for mode in ("rb", "wb"):
@@ -136,13 +178,28 @@ assert json.loads(data)['ok'] is False
         assert run_as(SERVICE, changed).returncode != 0
         start()
         assert call(AGENT, {"method": "status"}) == status, "restart reset identity/session/key"
+        call(AGENT, read, ok=False)
         stop(); socket.unlink()
         state.chmod(0o750)
         assert run_as(SERVICE, command).returncode != 0
         state.chmod(0o700)
         (state / "hostile-link").symlink_to(workspace / "example.txt")
         assert run_as(SERVICE, command).returncode != 0
+        (state / "hostile-link").unlink()
+        # Administrator fixture for state created by the earlier authority-only release.
+        # An upgrade must not silently activate it or reset its existing session.
+        with sqlite3.connect(state / "authority.db") as database:
+            database.execute("UPDATE sessions SET enforcement_posture='authority-ipc-only', status='starting'")
+        database.close()
+        start()
+        old_status = call(AGENT, {"method": "status"})
+        assert old_status["session_id"] == status["session_id"]
+        assert old_status["execution_actions"] == []
+        assert old_status["execution_supported"] is False
+        call(AGENT, read, ok=False)
+        stop()
         print("PASS: cross-account approvals, private state, impersonation, lease bounds and restart binding")
+        print("PASS: descriptor-bound reads, byte/owner/type/link checks, budget exhaustion and persistence")
     finally:
         if process is not None:
             process.terminate(); process.wait(timeout=10)
