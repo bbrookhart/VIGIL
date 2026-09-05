@@ -14,6 +14,7 @@ members = [
     "crates/vigil-identity",
     "crates/vigil-cli",
     "crates/vigil-local",
+    "crates/vigil-daemon",
     "crates/vigil-endpoint",
     "crates/vigil-network",
 ]

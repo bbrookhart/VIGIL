@@ -9,17 +9,17 @@ function count.
 
 | Evidence | Count |
 |---|---:|
-| Rust test entry points | 740 |
+| Rust test entry points | 745 |
 | Swift test entry points | 199 |
 | Python test functions | 11 |
 | Adversarial harness tests | 25 |
 | Named attack paths | 21 |
 | Release security gates | 11 |
 | Fuzz targets | 12 |
-| Architecture decision records | 55 |
-| Workspace crates | 15 |
+| Architecture decision records | 56 |
+| Workspace crates | 16 |
 | Unsafe Rust constructs | 0 |
-| Crates forbidding unsafe code | 15 |
+| Crates forbidding unsafe code | 17 |
 
 The counting rules live beside the claim in `scripts/generate_evidence.py`, and CI fails when
 this file or its JSON companion is stale.
