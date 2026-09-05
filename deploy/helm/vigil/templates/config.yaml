@@ -49,6 +49,12 @@ data:
           roles: {{ .roles | toJson }}
           {{- end }}
       {{- end }}
+{{- $gatewayAgents := list }}
+{{- range .Values.auth.registrations }}
+{{- if .agentId }}
+{{- $gatewayAgents = append $gatewayAgents . }}
+{{- end }}
+{{- end }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -67,8 +73,8 @@ data:
         public_key: {{ .Values.gateway.capabilityPublicKey | default "" | quote }}
     auth:
       method: {{ .Values.auth.method }}
-      registrations:{{ if not .Values.auth.registrations }} []{{ end }}
-      {{- range .Values.auth.registrations }}
+      registrations:{{ if not $gatewayAgents }} []{{ end }}
+      {{- range $gatewayAgents }}
       {{- if .agentId }}
         - spiffe_id: {{ .spiffeId | quote }}
           tenant_id: {{ .tenantId | quote }}
