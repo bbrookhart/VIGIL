@@ -6,6 +6,9 @@
 )]
 #![cfg(unix)]
 
+#[cfg(target_os = "linux")]
+mod confined_read;
+
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -59,7 +62,7 @@ impl Config {
     fn may_call(&self, uid: u32, request: &Request) -> bool {
         match request {
             Request::Status {} => uid == self.agent_uid || uid == self.operator_uid,
-            Request::Authorize { .. } => uid == self.agent_uid,
+            Request::Authorize { .. } | Request::Read { .. } => uid == self.agent_uid,
             Request::Approvals {}
             | Request::Grant { .. }
             | Request::Deny { .. }
@@ -72,6 +75,9 @@ impl Config {
 #[serde(tag = "method", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
     Status {},
+    Read {
+        resource: String,
+    },
     Authorize {
         action: LocalAction,
         resource: String,
@@ -134,6 +140,8 @@ struct Binding {
 }
 
 pub struct Authority {
+    #[cfg(target_os = "linux")]
+    workspace: confined_read::ConfinedWorkspace,
     config: Config,
     session_id: String,
     store: LocalStore,
@@ -145,6 +153,9 @@ impl Authority {
     pub fn open(state: &Path, config: Config) -> Result<Self> {
         let uid = rustix::process::geteuid().as_raw();
         config.validate(uid)?;
+        #[cfg(target_os = "linux")]
+        let workspace =
+            confined_read::ConfinedWorkspace::open(&config.workspace, config.agent_uid)?;
         check_directory(state, uid, true)?;
         // Inspect ALL existing entries before SQLite or key loading follows a path.
         // Only the service can subsequently change this directory.
@@ -217,6 +228,8 @@ impl Authority {
             session.id
         };
         Ok(Self {
+            #[cfg(target_os = "linux")]
+            workspace,
             config,
             session_id,
             store,
@@ -232,6 +245,7 @@ impl Authority {
         let operation = match &request {
             Request::Status {} => "status",
             Request::Authorize { .. } => "authorize",
+            Request::Read { .. } => "read",
             Request::Approvals {} => "approvals",
             Request::Grant { .. } => "grant",
             Request::Deny { .. } => "deny",
@@ -251,7 +265,8 @@ impl Authority {
         let result = match request {
             Request::Status {} => {
                 json!({"session_id": self.session_id, "agent_uid": self.config.agent_uid,
-                "profile": self.config.profile, "execution_supported": false,
+                "profile": self.config.profile, "execution_supported": cfg!(target_os = "linux"),
+                "execution_actions": if cfg!(target_os = "linux") { vec!["fs.read"] } else { vec![] },
                 "checkpoint_public_key": self.signer.verifying_key().to_bytes()})
             }
             Request::Authorize { action, resource } => {
@@ -277,6 +292,7 @@ impl Authority {
                 json!({"decision": auth.decision, "approval": auth.approval,
                     "risk_state": auth.risk_state, "execution_supported": false})
             }
+            Request::Read { resource } => self.execute_read(&resource, &intent.event_id)?,
             Request::Approvals {} => serde_json::to_value(self.store.list_approvals(
                 Some(&self.session_id),
                 None,
@@ -319,7 +335,7 @@ impl Authority {
             operation,
             Some("COMPLETED"),
             &intent.event_id,
-            &json!({"peer_uid": uid, "execution_supported": false,
+            &json!({"peer_uid": uid, "execution_performed": operation == "read",
                 "result_sha256": vigil_common::ContentHash::sha256(&serde_json::to_vec(&result)?).to_string()}),
         )?;
         Ok(json!({"ok": true, "result": result}))
@@ -331,6 +347,52 @@ impl Authority {
             return Err("approval belongs to another session".into());
         }
         Ok(())
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn execute_read(&self, _resource: &str, _correlation: &str) -> Result<Value> {
+        Err("descriptor-bound execution is currently Linux-only".into())
+    }
+
+    #[cfg(target_os = "linux")]
+    fn execute_read(&self, resource: &str, correlation: &str) -> Result<Value> {
+        use base64::Engine;
+        use vigil_local::{BudgetCharge, BudgetDimension};
+        let opened = self.workspace.prepare(resource, self.config.agent_uid)?;
+        // Fresh authorization in this call; an earlier ALLOW or caller-supplied
+        // decision cannot be replayed to the executor. Hold the descriptor throughout.
+        let auth = self.store.authorize_local(
+            &self.session_id,
+            self.config.profile,
+            &self.config.workspace,
+            LocalAction::FsRead,
+            resource,
+        )?;
+        if !auth.permits_execution() {
+            return Err("read denied by policy or risk".into());
+        }
+        let reservation = self.store.reserve_budget(
+            &self.session_id,
+            correlation,
+            &[BudgetCharge::new(BudgetDimension::FileReads, 1)],
+        )?;
+        // Charge the attempt before reading. A crash, read failure or disconnected
+        // client never refunds a possibly performed operation.
+        self.store.commit_budget(&reservation.id)?;
+        let (device, inode) = (opened.device, opened.inode);
+        let bytes = opened.read()?;
+        let event = self.store.append_event(
+            &self.session_id,
+            "filesystem",
+            "fs.read",
+            Some("EXECUTED"),
+            correlation,
+            &json!({"device": device, "inode": inode,
+                "bytes": bytes.len(), "reservation_id": reservation.id, "content_captured": false}),
+        )?;
+        Ok(json!({"action": "fs.read", "event_id": event.event_id,
+            "device": device, "inode": inode, "bytes": bytes.len(),
+            "content_base64": base64::engine::general_purpose::STANDARD.encode(bytes)}))
     }
 }
 
@@ -456,6 +518,7 @@ mod tests {
             r#"{"method":"status","uid":1002}"#,
             r#"{"method":"authorize","action":"fs.read","resource":"x","profile":"observe"}"#,
             r#"{"method":"grant","approval_id":"x","max_uses":1,"ttl_seconds":30,"approver":"operator"}"#,
+            r#"{"method":"read","resource":"x","decision":"ALLOW"}"#,
         ] {
             assert!(serde_json::from_str::<Request>(input).is_err());
         }
